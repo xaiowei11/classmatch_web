@@ -59,7 +59,8 @@ class Course(models.Model):
     COURSE_TYPE_CHOICES = [
         ('required', '必修'),
         ('elective', '選修'),
-        ('general', '通識'),
+        ('general_required', '通識(必修)'),
+        ('general_elective', '通識(選修)'),
     ]
     
     # 學期選項
@@ -89,7 +90,7 @@ class Course(models.Model):
     # 基本資料
     course_code = models.CharField(max_length=20, unique=True, verbose_name="課程代碼")  # 例如：CS101
     course_name = models.CharField(max_length=100, verbose_name="課程名稱")
-    course_type = models.CharField(max_length=10, choices=COURSE_TYPE_CHOICES, verbose_name="課程類別")
+    course_type = models.CharField(max_length=20, choices=COURSE_TYPE_CHOICES, verbose_name="課程類別")
     description = models.TextField(blank=True, verbose_name="課程描述")
     
     # 學分與時數

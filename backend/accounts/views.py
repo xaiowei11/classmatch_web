@@ -315,3 +315,61 @@ def create_course(request):
     except Exception as e:
         print(f"建立課程錯誤: {str(e)}")
         return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+def get_all_courses(request):
+    """獲取所有課程列表"""
+    try:
+        courses = Course.objects.all().select_related('teacher').order_by('-created_at')
+        
+        courses_data = []
+        for course in courses:
+            courses_data.append({
+                'id': course.id,
+                'course_code': course.course_code,
+                'course_name': course.course_name,
+                'course_type': course.course_type,
+                'description': course.description,
+                'credits': course.credits,
+                'hours': course.hours,
+                'academic_year': course.academic_year,
+                'semester': course.semester,
+                'department': course.department,
+                'grade_level': course.grade_level,
+                'teacher_id': course.teacher.id if course.teacher else None,
+                'teacher_name': course.teacher.profile.real_name if course.teacher and hasattr(course.teacher, 'profile') else '未設定',
+                'classroom': course.classroom,
+                'weekday': course.weekday,
+                'start_period': course.start_period,
+                'end_period': course.end_period,
+                'max_students': course.max_students,
+                'current_students': course.current_students,
+                'status': course.status,
+            })
+        
+        print(f"找到 {len(courses_data)} 門課程")
+        return Response(courses_data)
+        
+    except Exception as e:
+        print(f"錯誤: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@api_view(['DELETE'])
+def delete_course(request, course_id):
+    """刪除課程"""
+    try:
+        course = Course.objects.get(id=course_id)
+        course_name = course.course_name
+        course.delete()
+        
+        print(f"課程刪除成功: {course_name}")
+        return Response({'message': '課程刪除成功'})
+        
+    except Course.DoesNotExist:
+        return Response({'error': '找不到該課程'}, status=404)
+    except Exception as e:
+        print(f"刪除課程錯誤: {str(e)}")
+        return Response({'error': str(e)}, status=500)

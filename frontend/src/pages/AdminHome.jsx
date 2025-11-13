@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import RegisterAccount from '../components/admin/RegisterAccount'
 import CreateCourse from '../components/admin/CreateCourse'
+import ViewAllCourses from '../components/admin/ViewAllCourses'
 
 export default function AdminHome() {
-  const [activeTab, setActiveTab] = useState('register')
+  const [activeTab, setActiveTab] = useState('viewCourses') // 預設為查看課程
   const navigate = useNavigate()
   
   const username = localStorage.getItem('username') || '管理員'
@@ -28,18 +29,21 @@ export default function AdminHome() {
   }
 
   const navItems = [
-    { id: 'register', label: '新增帳號' },
-    { id: 'createCourse', label: '新增課程' }
+    { id: 'viewCourses', label: '查看所有課程', category: 'courses' },
+    { id: 'createCourse', label: '新增課程', category: 'courses' },
+    { id: 'register', label: '新增帳號', category: 'accounts' }
   ]
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'register':
-        return <RegisterAccount />
+      case 'viewCourses':
+        return <ViewAllCourses />
       case 'createCourse':
         return <CreateCourse />
-      default:
+      case 'register':
         return <RegisterAccount />
+      default:
+        return <ViewAllCourses />
     }
   }
 

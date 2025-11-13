@@ -34,6 +34,13 @@ export default function LoginPage() {
     }
   }
 
+  // 處理 Enter 鍵按下事件
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleLogin()
+    }
+  }
+
   const chooseRole = (r) => {
     navigate(`/${r}home`)
   }
@@ -57,7 +64,8 @@ export default function LoginPage() {
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
             placeholder="帳號" 
             value={username}
-            onChange={e => setUsername(e.target.value)} 
+            onChange={e => setUsername(e.target.value)}
+            onKeyPress={handleKeyPress}
           />
           
           <input 
@@ -65,7 +73,8 @@ export default function LoginPage() {
             placeholder="密碼" 
             type="password"
             value={password}
-            onChange={e => setPassword(e.target.value)} 
+            onChange={e => setPassword(e.target.value)}
+            onKeyPress={handleKeyPress}
           />
           
           <button 

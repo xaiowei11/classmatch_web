@@ -96,7 +96,7 @@ export default function StudentHome() {
               className={`flex-1 py-4 px-6 text-center font-bold text-lg transition-colors ${
                 activeTab === item.id
                   ? 'bg-orange-400 text-gray-900'
-                  : 'bg-orange-300 text-gray-800 hover:bg-orange-350'
+                  : 'bg-orange-300 text-gray-800 hover:bg-orange-200'
               }`}
             >
               {item.label}
