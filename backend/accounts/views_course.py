@@ -12,7 +12,7 @@ import openpyxl
 from io import BytesIO
 
 
-@api_view(['GET', 'POST'])  # ← 改這裡，同時支援 GET 和 POST
+@api_view(['GET', 'POST'])
 def search_courses(request):
     """搜尋課程"""
     try:
@@ -22,19 +22,25 @@ def search_courses(request):
             department = request.GET.get('department', '').strip()
             course_type = request.GET.get('course_type', '').strip()
             semester = request.GET.get('semester', '').strip()
-            weekday = request.GET.get('weekday', '').strip()
             grade_level = request.GET.get('grade_level', '').strip()
             academic_year = request.GET.get('academic_year', '114')
+            # 複選參數（可能有多個值）
+            weekdays = request.GET.getlist('weekdays')
+            periods = request.GET.getlist('periods')
         else:  # POST
             keyword = request.data.get('keyword', '').strip()
             department = request.data.get('department', '').strip()
             course_type = request.data.get('course_type', '').strip()
             semester = request.data.get('semester', '').strip()
-            weekday = request.data.get('weekday', '').strip()
             grade_level = request.data.get('grade_level', '').strip()
             academic_year = request.data.get('academic_year', '114')
+            # 複選參數
+            weekdays = request.data.get('weekdays', [])
+            periods = request.data.get('periods', [])
         
-        print(f"搜尋條件: keyword={keyword}, department={department}, course_type={course_type}, semester={semester}, weekday={weekday}, grade_level={grade_level}, academic_year={academic_year}")
+        print(f"搜尋條件: keyword={keyword}, department={department}, course_type={course_type}, "
+              f"semester={semester}, weekdays={weekdays}, periods={periods}, "
+              f"grade_level={grade_level}, academic_year={academic_year}")
         
         # 基本查詢：取得所有開課資料
         offerings = CourseOffering.objects.select_related(
@@ -59,9 +65,25 @@ def search_courses(request):
         if grade_level:
             offerings = offerings.filter(grade_level=int(grade_level))
         
-        if weekday:
-            offerings = offerings.filter(class_times__weekday=weekday).distinct()
+        # 複選星期篩選
+        if weekdays and len(weekdays) > 0:
+            # 找出至少符合其中一個星期的課程
+            offerings = offerings.filter(class_times__weekday__in=weekdays).distinct()
         
+        # 複選節次篩選
+        if periods and len(periods) > 0:
+            # 找出上課時段與選定節次有重疊的課程
+            period_query = Q()
+            for period in periods:
+                period_int = int(period)
+                # 檢查 start_period <= period <= end_period
+                period_query |= Q(
+                    class_times__start_period__lte=period_int,
+                    class_times__end_period__gte=period_int
+                )
+            offerings = offerings.filter(period_query).distinct()
+        
+        # 關鍵字搜尋（課程代碼、課程名稱、教師姓名）
         if keyword:
             offerings = offerings.filter(
                 Q(course__course_name__icontains=keyword) |
