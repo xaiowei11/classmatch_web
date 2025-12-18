@@ -1,7 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
-//import schoolLogo from '../images/maxresdefault.jpg'
+import schoolLogo from '../images/maxresdefault.jpg'
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -9,15 +24,38 @@ export default function LoginPage() {
   const [roles, setRoles] = useState([])
   const navigate = useNavigate()
 
+  // 組件載入時先獲取 CSRF token
+  useEffect(() => {
+    fetchCSRFToken()
+  }, [])
+
+  const fetchCSRFToken = async () => {
+    try {
+      // 訪問任意 GET 端點來獲取 CSRF token
+      await axios.get('http://localhost:8000/api/courses/filter-options/', {
+        withCredentials: true
+      })
+      console.log('CSRF token 已獲取')
+    } catch (error) {
+      console.error('獲取 CSRF token 失敗:', error)
+    }
+  }
+
   const handleLogin = async () => {
     try {
+      const csrfToken = getCookie('csrftoken')
+      console.log('CSRF Token:', csrfToken)
+      
       const res = await axios.post('http://localhost:8000/api/login/', {
         username, password
       }, {
-        withCredentials: true
+        withCredentials: true,
+        headers: csrfToken ? {
+          'X-CSRFToken': csrfToken
+        } : {}
       })
+      
       console.log('後端返回的完整數據：', res.data)
-      console.log('角色列表：', res.data.roles)
       
       localStorage.setItem('username', username)
       if (res.data.real_name) {
@@ -30,10 +68,11 @@ export default function LoginPage() {
         setRoles(res.data.roles)
       }
     } catch (err) {
-      alert('登入失敗')
+      console.error('登入錯誤:', err)
+      alert('登入失敗: ' + (err.response?.data?.error || err.message))
     }
   }
-
+  
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
       handleLogin()
@@ -58,11 +97,11 @@ export default function LoginPage() {
       <div className="rounded-3xl shadow-2xl p-10 w-full max-w-md">
         {/* 學校 Logo */}
         <div className="flex justify-center">
-          {/* <img 
+          <img 
             src={schoolLogo} 
             alt="學校logo" 
             className="w-64 h-auto object-contain"
-          /> */}
+          />
         </div>
         
         {/* 登入表單 */}

@@ -12,18 +12,27 @@ import openpyxl
 from io import BytesIO
 
 
-@api_view(['POST'])
+@api_view(['GET', 'POST'])  # ← 改這裡，同時支援 GET 和 POST
 def search_courses(request):
     """搜尋課程"""
     try:
-        # 取得搜尋條件
-        keyword = request.data.get('keyword', '').strip()
-        department = request.data.get('department', '').strip()
-        course_type = request.data.get('course_type', '').strip()
-        semester = request.data.get('semester', '').strip()
-        weekday = request.data.get('weekday', '').strip()
-        grade_level = request.data.get('grade_level', '').strip()
-        academic_year = request.data.get('academic_year', '114')  # 預設 114 學年度
+        # 支援 GET 和 POST 兩種方式取得參數
+        if request.method == 'GET':
+            keyword = request.GET.get('keyword', '').strip()
+            department = request.GET.get('department', '').strip()
+            course_type = request.GET.get('course_type', '').strip()
+            semester = request.GET.get('semester', '').strip()
+            weekday = request.GET.get('weekday', '').strip()
+            grade_level = request.GET.get('grade_level', '').strip()
+            academic_year = request.GET.get('academic_year', '114')
+        else:  # POST
+            keyword = request.data.get('keyword', '').strip()
+            department = request.data.get('department', '').strip()
+            course_type = request.data.get('course_type', '').strip()
+            semester = request.data.get('semester', '').strip()
+            weekday = request.data.get('weekday', '').strip()
+            grade_level = request.data.get('grade_level', '').strip()
+            academic_year = request.data.get('academic_year', '114')
         
         print(f"搜尋條件: keyword={keyword}, department={department}, course_type={course_type}, semester={semester}, weekday={weekday}, grade_level={grade_level}, academic_year={academic_year}")
         
@@ -118,15 +127,15 @@ def search_courses(request):
         return Response({'error': str(e)}, status=500)
 
 
-@csrf_exempt
+#csrf_exempt
 @api_view(['POST'])
-def enroll_course(request):
+def enroll_course(request, course_id):  # ← 加上 course_id 參數
     """選課"""
     try:
         if not request.user.is_authenticated:
             return Response({'error': '請先登入'}, status=401)
         
-        offering_id = request.data.get('offering_id')
+        offering_id = course_id  # ← 直接用 course_id
         
         if not offering_id:
             return Response({'error': '缺少開課 ID'}, status=400)
@@ -173,15 +182,15 @@ def enroll_course(request):
         return Response({'error': str(e)}, status=500)
 
 
-@csrf_exempt
+#@csrf_exempt
 @api_view(['POST'])
-def drop_course(request):
+def drop_course(request, course_id):  # ← 加上 course_id 參數
     """退選"""
     try:
         if not request.user.is_authenticated:
             return Response({'error': '請先登入'}, status=401)
         
-        offering_id = request.data.get('offering_id')
+        offering_id = course_id  # ← 直接用 course_id
         
         if not offering_id:
             return Response({'error': '缺少開課 ID'}, status=400)
@@ -212,15 +221,24 @@ def drop_course(request):
         
     except Exception as e:
         print(f"退選錯誤: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return Response({'error': str(e)}, status=500)
 
 
 @api_view(['GET'])
+# 移除這兩行認證裝飾器，改用手動檢查
+# @authentication_classes([SessionAuthentication]) 
+# @permission_classes([IsAuthenticated])
 def get_enrolled_courses(request):
     """取得已選課程"""
     try:
+        # 手動檢查登入狀態
         if not request.user.is_authenticated:
-            return Response({'error': '請先登入'}, status=401)
+            print("使用者未登入")
+            return Response([], status=200)  # 返回空陣列而不是錯誤
+        
+        print(f"取得 {request.user.username} 的選課記錄")
         
         enrollments = Enrollment.objects.filter(
             student=request.user,
@@ -265,22 +283,25 @@ def get_enrolled_courses(request):
                 'enrolled_at': enrollment.enrolled_at.strftime('%Y-%m-%d %H:%M:%S'),
             })
         
+        print(f"找到 {len(courses_data)} 門已選課程")
         return Response(courses_data)
         
     except Exception as e:
         print(f"錯誤: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return Response({'error': str(e)}, status=500)
 
 
-@csrf_exempt
 @api_view(['POST'])
-def toggle_favorite(request):
+def toggle_favorite(request, course_id):  # ← 加上 course_id 參數
     """收藏/取消收藏課程"""
     try:
         if not request.user.is_authenticated:
             return Response({'error': '請先登入'}, status=401)
         
-        offering_id = request.data.get('offering_id')
+        # 從 URL 參數取得 offering_id
+        offering_id = course_id  # ← 這裡直接用 course_id（其實是 offering_id）
         
         if not offering_id:
             return Response({'error': '缺少開課 ID'}, status=400)
@@ -310,6 +331,8 @@ def toggle_favorite(request):
         
     except Exception as e:
         print(f"收藏錯誤: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return Response({'error': str(e)}, status=500)
 
 
@@ -369,7 +392,7 @@ def get_favorite_courses(request):
         return Response({'error': str(e)}, status=500)
 
 
-@csrf_exempt
+#@csrf_exempt
 @api_view(['POST'])
 def import_courses_excel(request):
     """從 Excel 匯入課程"""

@@ -26,13 +26,13 @@ export default function MyCourses() {
 
   // 定義星期
   const weekdays = [
-    { value: 1, label: '星期一' },
-    { value: 2, label: '星期二' },
-    { value: 3, label: '星期三' },
-    { value: 4, label: '星期四' },
-    { value: 5, label: '星期五' },
-    { value: 6, label: '星期六' },
-    { value: 7, label: '星期日' },
+    { value: '1', label: '星期一' },
+    { value: '2', label: '星期二' },
+    { value: '3', label: '星期三' },
+    { value: '4', label: '星期四' },
+    { value: '5', label: '星期五' },
+    { value: '6', label: '星期六' },
+    { value: '7', label: '星期日' },
   ]
 
   useEffect(() => {
@@ -52,81 +52,41 @@ export default function MyCourses() {
       if (response.ok) {
         const data = await response.json()
         console.log('API 回傳資料:', data)
-        console.log('課程數量:', data.courses?.length)
-        if (data.courses && data.courses.length > 0) {
-          console.log('第一門課程:', data.courses[0])
-          console.log('第一門課程的 weekday_value:', data.courses[0].weekday_value, '型別:', typeof data.courses[0].weekday_value)
-          console.log('第一門課程的 start_period:', data.courses[0].start_period, '型別:', typeof data.courses[0].start_period)
-          console.log('第一門課程的 end_period:', data.courses[0].end_period, '型別:', typeof data.courses[0].end_period)
-        }
-        setCourses(data.courses || [])
+        
+        // 處理課程資料，展開 class_times
+        const processedCourses = []
+        data.forEach(enrollment => {
+          if (enrollment.class_times && enrollment.class_times.length > 0) {
+            enrollment.class_times.forEach(classTime => {
+              processedCourses.push({
+                id: `${enrollment.id}-${classTime.weekday}-${classTime.start_period}`,
+                course_id: enrollment.id,
+                course_code: enrollment.course_code,
+                course_name: enrollment.course_name,
+                credits: enrollment.credits,
+                teacher_name: enrollment.teachers && enrollment.teachers.length > 0
+                  ? enrollment.teachers.map(t => t.name).join('、')
+                  : '未設定',
+                classroom: classTime.classroom,
+                weekday: classTime.weekday_display,
+                weekday_value: classTime.weekday,
+                start_period: classTime.start_period,
+                end_period: classTime.end_period,
+                time_display: `${classTime.weekday_display} 第${classTime.start_period}-${classTime.end_period}節`
+              })
+            })
+          }
+        })
+        
+        console.log('處理後的課程:', processedCourses)
+        setCourses(processedCourses)
       } else {
         console.error('獲取課程失敗')
-        // 使用測試資料
-        const testData = [
-          {
-            id: 1,
-            course_code: '0001',
-            course_name: '第二堂課',
-            credits: 2,
-            teacher_name: '未設定',
-            classroom: 'B210',
-            weekday: '星期一',
-            weekday_value: 1,
-            start_period: 1,
-            end_period: 2,
-            time_display: '星期一 第1-2節'
-          },
-          {
-            id: 2,
-            course_code: '1041',
-            course_name: '性別與健康照護',
-            credits: 2,
-            teacher_name: '第一位老師',
-            classroom: 'F412',
-            weekday: '星期五',
-            weekday_value: 5,
-            start_period: 6,
-            end_period: 7,
-            time_display: '星期五 第6-7節'
-          }
-        ]
-        console.log('使用測試資料:', testData)
-        setCourses(testData)
+        setCourses([])
       }
     } catch (error) {
       console.error('獲取已選課程失敗:', error)
-      // 使用測試資料
-      const testData = [
-        {
-          id: 1,
-          course_code: '0001',
-          course_name: '第二堂課',
-          credits: 2,
-          teacher_name: '未設定',
-          classroom: 'B210',
-          weekday: '星期一',
-          weekday_value: 1,
-          start_period: 1,
-          end_period: 2,
-          time_display: '星期一 第1-2節'
-        },
-        {
-          id: 2,
-          course_code: '1041',
-          course_name: '性別與健康照護',
-          credits: 2,
-          teacher_name: '第一位老師',
-          classroom: 'F412',
-          weekday: '星期五',
-          weekday_value: 5,
-          start_period: 6,
-          end_period: 7,
-          time_display: '星期五 第6-7節'
-        }
-      ]
-      console.log('使用測試資料:', testData)
-      setCourses(testData)
+      setCourses([])
     } finally {
       setLoading(false)
     }
@@ -136,21 +96,15 @@ export default function MyCourses() {
   const getCourseAt = (weekday, period) => {
     const result = courses.filter(course => {
       // 確保型別一致的比較
-      const courseWeekday = Number(course.weekday_value)
-      const weekdayNum = Number(weekday)
+      const courseWeekday = String(course.weekday_value)
+      const weekdayStr = String(weekday)
       const coursePeriodStart = Number(course.start_period)
       const coursePeriodEnd = Number(course.end_period)
       const periodNum = Number(period)
       
-      const match = courseWeekday === weekdayNum && 
+      const match = courseWeekday === weekdayStr && 
                     periodNum >= coursePeriodStart && 
                     periodNum <= coursePeriodEnd
-      
-      if (match) {
-        console.log(`✓ 星期${weekday} 第${period}節 找到課程: ${course.course_name}`)
-        console.log(`  課程星期: ${course.weekday_value} (${courseWeekday}), 比較星期: ${weekday} (${weekdayNum})`)
-        console.log(`  課程節次: ${course.start_period}-${course.end_period}, 比較節次: ${period}`)
-      }
       
       return match
     })
@@ -160,13 +114,13 @@ export default function MyCourses() {
   // 檢查這個格子是否應該被合併（是某課程的延續）
   const shouldMerge = (weekday, period) => {
     const coursesAtThisPeriod = courses.filter(course => {
-      const courseWeekday = Number(course.weekday_value)
-      const weekdayNum = Number(weekday)
+      const courseWeekday = String(course.weekday_value)
+      const weekdayStr = String(weekday)
       const coursePeriodStart = Number(course.start_period)
       const coursePeriodEnd = Number(course.end_period)
       const periodNum = Number(period)
       
-      return courseWeekday === weekdayNum && 
+      return courseWeekday === weekdayStr && 
              periodNum > coursePeriodStart && 
              periodNum <= coursePeriodEnd
     })
@@ -254,11 +208,14 @@ export default function MyCourses() {
                           className="border border-gray-300 p-2 align-middle w-40"
                           rowSpan={rowSpan}
                         >
-                          <div className="bg-yellow-100 rounded p-3 flex flex-col items-center justify-center gap-1" 
+                          <div className="bg-blue-100 rounded p-3 flex flex-col items-center justify-center gap-1" 
                                style={{ height: `${rowSpan * 80 - 16}px` }}>
                             <div className="font-semibold text-sm text-gray-800 text-center line-clamp-2 overflow-hidden">
                               {course.course_name}
                             </div>
+                            {/* <div className="text-xs text-gray-600 text-center">
+                              {course.teacher_name}
+                            </div> */}
                             <div className="text-xs text-gray-600 text-center">
                               {course.classroom}
                             </div>

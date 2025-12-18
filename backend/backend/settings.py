@@ -50,7 +50,7 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True  # ← 新增：允許傳遞 cookie
 
 # ===== Session 設定（新增）=====
-SESSION_COOKIE_SAMESITE = None # ⬅️ 修改：開發環境設為 None
+SESSION_COOKIE_SAMESITE = "Lax" # ⬅️ 修改：開發環境設為 None
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = False  # 開發環境用 False
 SESSION_COOKIE_AGE = 86400  # 1天
@@ -60,15 +60,14 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
-CSRF_COOKIE_SAMESITE = None # ⬅️ 新增：CSRF Cookie 也需要設定
+CSRF_COOKIE_SAMESITE = "Lax" # ⬅️ 新增：CSRF Cookie 也需要設定
 
 # 
 # ⬇️ ⬇️ ⬇️ 這裡是最重要的修改 ⬇️ ⬇️ ⬇️
 # 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # 移除 'rest_framework.authentication.SessionAuthentication',
-        # 這會讓 @csrf_exempt 重新生效
+        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         # 預設允許所有人訪問，我們稍後在視圖中單獨設定權限

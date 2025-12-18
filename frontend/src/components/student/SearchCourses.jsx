@@ -67,7 +67,8 @@ export default function SearchCourses() {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       const data = await response.json()
-      setCourses(data.courses || [])
+      console.log('收到的資料:', data)
+      setCourses(data || [])
     } catch (error) {
       console.error('查詢課程失敗:', error)
       alert('查詢課程失敗: ' + error.message)
@@ -90,7 +91,7 @@ export default function SearchCourses() {
       course_type: '',
       weekday: '',
       grade_level: '',
-      academic_year: '113'
+      academic_year: '114'
     })
   }
 
@@ -102,7 +103,8 @@ export default function SearchCourses() {
         headers: {
           'Content-Type': 'application/json',
           'X-CSRFToken': getCookie('csrftoken'),
-        }
+        },
+        //body: JSON.stringify({ offering_id: courseId })
       })
       
       if (response.ok) {
@@ -130,7 +132,7 @@ export default function SearchCourses() {
       'elective': 'bg-blue-100 text-blue-800',
       'general_required': 'bg-green-100 text-green-800',
       'general_elective': 'bg-yellow-100 text-yellow-800',
-      'general': 'bg-green-100 text-green-800',  // 支援舊的 general 類型
+      'general': 'bg-green-100 text-green-800',
     }
     return colors[type] || 'bg-gray-100 text-gray-800'
   }
@@ -212,7 +214,7 @@ export default function SearchCourses() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">全部</option>
-              {filterOptions.grade_levels?.map(grade => (
+              {filterOptions.grades?.map(grade => (
                 <option key={grade.value} value={grade.value}>{grade.label}</option>
               ))}
             </select>
@@ -258,53 +260,71 @@ export default function SearchCourses() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {courses.map(course => (
-                  <tr key={course.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {course.course_code}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <button
-                        onClick={() => setSelectedCourse(course)}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left"
-                      >
-                        {course.course_name}
-                      </button>
-                    </td><td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {course.department}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getCourseTypeColor(course.course_type_value)}`}>
-                        {course.course_type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {course.credits}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {course.teacher_name}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {course.time_display}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {course.classroom}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {course.current_students}/{course.max_students}
-                      {course.is_full && <span className="ml-1 text-red-500">(額滿)</span>}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">
-                      <button
-                        onClick={() => toggleFavorite(course.id)}
-                        className={`text-2xl ${course.is_favorited ? 'text-yellow-500' : 'text-gray-300'} hover:text-yellow-500 transition-colors`}
-                        title={course.is_favorited ? '取消收藏' : '加入收藏'}
-                      >
-                        {course.is_favorited ? '★' : '☆'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {courses.map(course => {
+                  // 取得教師名稱
+                  const teacherNames = course.teachers && course.teachers.length > 0
+                    ? course.teachers.map(t => t.name).join('、')
+                    : '未設定'
+                  
+                  // 取得上課時間
+                  const timeDisplay = course.class_times && course.class_times.length > 0
+                    ? course.class_times.map(t => `${t.weekday_display} ${t.start_period}-${t.end_period}節`).join('；')
+                    : '未設定'
+                  
+                  // 取得教室
+                  const classroom = course.class_times && course.class_times.length > 0
+                    ? course.class_times[0].classroom
+                    : '未設定'
+                  
+                  return (
+                    <tr key={course.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {course.course_code}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <button
+                          onClick={() => setSelectedCourse(course)}
+                          className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left"
+                        >
+                          {course.course_name}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {course.department}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getCourseTypeColor(course.course_type)}`}>
+                          {course.course_type_display}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {course.credits}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {teacherNames}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {timeDisplay}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {classroom}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {course.current_students}/{course.max_students}
+                        {course.status === 'full' && <span className="ml-1 text-red-500">(額滿)</span>}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => toggleFavorite(course.id)}
+                          className={`text-2xl ${course.is_favorited ? 'text-yellow-500' : 'text-gray-300'} hover:text-yellow-500 transition-colors`}
+                          title={course.is_favorited ? '取消收藏' : '加入收藏'}
+                        >
+                          {course.is_favorited ? '★' : '☆'}
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -346,21 +366,33 @@ export default function SearchCourses() {
                   </div>
                   <div>
                     <span className="font-semibold text-gray-700">授課教師：</span>
-                    <span className="text-gray-600">{selectedCourse.teacher_name}</span>
+                    <span className="text-gray-600">
+                      {selectedCourse.teachers && selectedCourse.teachers.length > 0
+                        ? selectedCourse.teachers.map(t => t.name).join('、')
+                        : '未設定'}
+                    </span>
                   </div>
                   <div>
                     <span className="font-semibold text-gray-700">課程類別：</span>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getCourseTypeColor(selectedCourse.course_type_value)}`}>
-                      {selectedCourse.course_type}
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getCourseTypeColor(selectedCourse.course_type)}`}>
+                      {selectedCourse.course_type_display}
                     </span>
                   </div>
                   <div>
                     <span className="font-semibold text-gray-700">上課時間：</span>
-                    <span className="text-gray-600">{selectedCourse.time_display}</span>
+                    <span className="text-gray-600">
+                      {selectedCourse.class_times && selectedCourse.class_times.length > 0
+                        ? selectedCourse.class_times.map(t => `${t.weekday_display} ${t.start_period}-${t.end_period}節`).join('；')
+                        : '未設定'}
+                    </span>
                   </div>
                   <div>
                     <span className="font-semibold text-gray-700">上課教室：</span>
-                    <span className="text-gray-600">{selectedCourse.classroom}</span>
+                    <span className="text-gray-600">
+                      {selectedCourse.class_times && selectedCourse.class_times.length > 0
+                        ? selectedCourse.class_times.map(t => t.classroom).join('、')
+                        : '未設定'}
+                    </span>
                   </div>
                   <div>
                     <span className="font-semibold text-gray-700">開課系所：</span>
