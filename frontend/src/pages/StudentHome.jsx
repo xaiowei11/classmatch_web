@@ -18,12 +18,25 @@ export default function StudentHome() {
 
   const handleLogout = async () => {
     try {
+      // 從 cookie 取得 CSRF token
+      const getCookie = (name) => {
+        const value = `; ${document.cookie}`
+        const parts = value.split(`; ${name}=`)
+        if (parts.length === 2) return parts.pop().split(';').shift()
+      }
+      
+      const csrfToken = getCookie('csrftoken')
+      
       // 先呼叫後端登出 API
       await axios.post(API_ENDPOINTS.logout, {}, {
-        withCredentials: true
+        withCredentials: true,
+        headers: csrfToken ? {
+          'X-CSRFToken': csrfToken
+        } : {}
       })
     } catch (error) {
       console.error('登出 API 失敗:', error)
+      // 即使 API 失敗也繼續登出流程
     }
     
     // 清除 localStorage
