@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Django URL 配置
 整合所有分離的 views 模組
@@ -22,6 +23,8 @@ urlpatterns = [
     # ===== 課程查詢與篩選 API（必須在 courses/ 之前）=====
     path('courses/search/', views_course.search_courses, name='search_courses'),
     path('courses/filter-options/', views_course.get_filter_options, name='filter_options'),
+    path('courses/<int:course_id>/detail/', views_course.get_course_detail, name='get_course_detail'),
+    path('courses/<int:course_id>/update/', views_course.update_course, name='update_course'),
     
     # ===== 課程收藏 API =====
     path('courses/<int:course_id>/favorite/', views_course.toggle_favorite, name='toggle_favorite'),

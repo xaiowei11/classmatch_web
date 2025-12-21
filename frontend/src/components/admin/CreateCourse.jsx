@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import * as XLSX from 'xlsx'
 
-export default function CreateCourse() {
+export default function CreateCourse({ editingCourseId, onSaveComplete }) {
   const [formData, setFormData] = useState({
     course_code: '',
     course_name: '',
@@ -26,12 +26,39 @@ export default function CreateCourse() {
   const [loading, setLoading] = useState(false)
   const [importLoading, setImportLoading] = useState(false)
   const [importResults, setImportResults] = useState(null)
-  const [importDepartment, setImportDepartment] = useState('資管系') // 匯入時使用的系所
+  const [importDepartment, setImportDepartment] = useState('資管系')
+  const [isEditMode, setIsEditMode] = useState(false)
 
   // 載入教師列表
   useEffect(() => {
     fetchTeachers()
   }, [])
+
+  // 當 editingCourseId 變化時，載入課程資料
+  useEffect(() => {
+    if (editingCourseId) {
+      setIsEditMode(true)
+      fetchCourseDetail(editingCourseId)
+    } else {
+      setIsEditMode(false)
+      // 重置表單為新增模式
+      resetForm()
+    }
+  }, [editingCourseId])
+
+  const fetchCourseDetail = async (courseId) => {
+    try {
+      setLoading(true)
+      const response = await axios.get(`http://localhost:8000/api/courses/${courseId}/detail/`)
+      setFormData(response.data)
+      console.log('載入課程資料成功:', response.data)
+    } catch (error) {
+      console.error('載入課程資料失敗:', error)
+      alert('載入課程資料失敗，請稍後再試')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const fetchTeachers = async () => {
     try {
@@ -81,6 +108,124 @@ export default function CreateCourse() {
     label: `第 ${i + 1} 節`
   }))
 
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const validateForm = () => {
+    if (!formData.course_code.trim()) {
+      alert('請輸入課程代碼')
+      return false
+    }
+    if (!formData.course_name.trim()) {
+      alert('請輸入課程名稱')
+      return false
+    }
+    if (!formData.teacher_id) {
+      alert('請選擇授課教師')
+      return false
+    }
+    if (!formData.classroom.trim()) {
+      alert('請輸入教室')
+      return false
+    }
+    if (parseInt(formData.start_period) > parseInt(formData.end_period)) {
+      alert('開始節次不能大於結束節次')
+      return false
+    }
+    return true
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    if (!validateForm()) return
+
+    setLoading(true)
+    
+    try {
+      const submitData = {
+        ...formData,
+        credits: parseInt(formData.credits),
+        hours: parseInt(formData.hours),
+        grade_level: parseInt(formData.grade_level),
+        start_period: parseInt(formData.start_period),
+        end_period: parseInt(formData.end_period),
+        max_students: parseInt(formData.max_students),
+        teacher_id: parseInt(formData.teacher_id)
+      }
+
+      if (isEditMode && editingCourseId) {
+        // 更新模式
+        await axios.put(`http://localhost:8000/api/courses/${editingCourseId}/update/`, submitData)
+        alert('課程更新成功!')
+      } else {
+        // 新增模式
+        await axios.post('http://localhost:8000/api/courses/create/', submitData)
+        alert('課程建立成功!')
+      }
+      
+      // 呼叫完成回調
+      if (onSaveComplete) {
+        onSaveComplete()
+      } else {
+        // 如果沒有回調，就重置表單
+        resetForm()
+      }
+    } catch (err) {
+      console.error('儲存課程錯誤:', err)
+      if (err.response?.data?.error) {
+        alert(`${isEditMode ? '更新' : '建立'}失敗：${err.response.data.error}`)
+      } else {
+        alert(`${isEditMode ? '更新' : '建立'}失敗，請稍後再試`)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      course_code: '',
+      course_name: '',
+      course_type: 'required',
+      description: '',
+      credits: '2',
+      hours: '2',
+      academic_year: '114',
+      semester: '1',
+      department: '資管系',
+      grade_level: '1',
+      teacher_id: '',
+      classroom: '',
+      weekday: '1',
+      start_period: '1',
+      end_period: '2',
+      max_students: '50'
+    })
+  }
+
+  const handleReset = () => {
+    if (confirm('確定要清空表單嗎？')) {
+      resetForm()
+    }
+  }
+
+  const handleCancel = () => {
+    if (confirm('確定要取消編輯嗎？未儲存的變更將會遺失。')) {
+      if (onSaveComplete) {
+        onSaveComplete()
+      } else {
+        resetForm()
+        setIsEditMode(false)
+      }
+    }
+  }
+
   // 課別名稱對應到課程類型
   const mapCourseType = (courseCategoryName) => {
     const name = String(courseCategoryName).trim()
@@ -103,10 +248,10 @@ export default function CreateCourse() {
     
     // 最後才是一般通識（向後相容）
     if (name.includes('通識')) {
-      return 'general_elective' // 預設通識為選修
+      return 'general_elective'
     }
     
-    return 'elective' // 預設為選修
+    return 'elective'
   }
 
   // 星期文字對應到數字
@@ -192,7 +337,7 @@ export default function CreateCourse() {
           if (fifthRow.some(cell => String(cell).includes('開課系所'))) {
             hasOpeningDeptColumn = true
             console.log('偵測到有「開課系所」欄位（16 欄格式）')
-          } else if (sheet.ncols > 20) {
+          } else if (rawData[4].length > 20) {
             console.log('偵測到大型檔案格式（31 欄格式）')
           }
         }
@@ -238,7 +383,7 @@ export default function CreateCourse() {
             courseCode = String(row[3] || '').trim()
             gradeLevel = parseInt(row[4]) || 1
             courseName = String(row[5] || '').trim()
-            teacherName = String(row[6] || '').trim()  // 正確位置！
+            teacherName = String(row[6] || '').trim()
             maxStudents = parseInt(row[7]) || 50
             credits = parseInt(row[8]) || 2
             hoursPerWeek = parseFloat(row[10]) || 2
@@ -374,7 +519,7 @@ export default function CreateCourse() {
       if (results.success > 0) {
         alert(`匯入完成！\n成功：${results.success} 筆\n失敗：${results.failed} 筆${results.failed > 0 ? '\n\n請查看下方錯誤訊息' : ''}`)
       } else {
-        alert(`匯入失敗！所有 ${results.failed} 筆資料都未能成功匯入\n\n請查看下方錯誤訊息`)
+        alert(`匯入失敗：所有 ${results.failed} 筆資料都未能成功匯入\n\n請查看下方錯誤訊息`)
       }
 
       // 重新整理教師列表（以防有新增）
@@ -391,212 +536,116 @@ export default function CreateCourse() {
     }
   }
 
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
-
-  const validateForm = () => {
-    if (!formData.course_code.trim()) {
-      alert('請輸入課程代碼')
-      return false
-    }
-    if (!formData.course_name.trim()) {
-      alert('請輸入課程名稱')
-      return false
-    }
-    if (!formData.teacher_id) {
-      alert('請選擇授課教師')
-      return false
-    }
-    if (!formData.classroom.trim()) {
-      alert('請輸入教室')
-      return false
-    }
-    if (parseInt(formData.start_period) > parseInt(formData.end_period)) {
-      alert('開始節次不能大於結束節次')
-      return false
-    }
-    return true
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    
-    if (!validateForm()) return
-
-    setLoading(true)
-    
-    try {
-      const submitData = {
-        ...formData,
-        credits: parseInt(formData.credits),
-        hours: parseInt(formData.hours),
-        grade_level: parseInt(formData.grade_level),
-        start_period: parseInt(formData.start_period),
-        end_period: parseInt(formData.end_period),
-        max_students: parseInt(formData.max_students),
-        teacher_id: parseInt(formData.teacher_id)
-      }
-
-      await axios.post('http://localhost:8000/api/courses/create/', submitData)
-      
-      alert('課程建立成功！')
-      
-      // 清空表單
-      setFormData({
-        course_code: '',
-        course_name: '',
-        course_type: 'required',
-        description: '',
-        credits: '2',
-        hours: '2',
-        academic_year: '113',
-        semester: '1',
-        department: '資管系',
-        grade_level: '1',
-        teacher_id: '',
-        classroom: '',
-        weekday: '1',
-        start_period: '1',
-        end_period: '2',
-        max_students: '50'
-      })
-    } catch (err) {
-      console.error('建立課程錯誤:', err)
-      if (err.response?.data?.error) {
-        alert(`建立失敗：${err.response.data.error}`)
-      } else {
-        alert('建立失敗，請稍後再試')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleReset = () => {
-    setFormData({
-      course_code: '',
-      course_name: '',
-      course_type: 'required',
-      description: '',
-      credits: '2',
-      hours: '2',
-      academic_year: '113',
-      semester: '1',
-      department: '資管系',
-      grade_level: '1',
-      teacher_id: '',
-      classroom: '',
-      weekday: '1',
-      start_period: '1',
-      end_period: '2',
-      max_students: '50'
-    })
-  }
-
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
       <div className="bg-white rounded-lg shadow-md p-8">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-3">新增課程</h2>
-        
-        {/* XLSX 匯入區塊 */}
-        <div className="mb-8 bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-lg border-2 border-indigo-200">
-          <h3 className="text-lg font-bold text-gray-700 mb-3 flex items-center">
-            <svg className="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            批次匯入課程（XLSX）
-          </h3>
-          
-          <div className="mb-4 text-sm text-gray-600 bg-white p-3 rounded border border-gray-200">
-            <p className="font-semibold mb-2">📋 檔案格式說明：</p>
-            <p className="mb-1">欄位順序：學期、主開課教師姓名、核心四碼、年級、科目中文名稱、授課教師姓名、上課人數、學分數、上課週次、上課時數/週、課別名稱、上課地點、上課星期、上課節次、課程中文摘要</p>
-            <p className="text-xs text-gray-500 mt-2">範例：1141, 蘇美禎, 1041, 1, 性別與健康照護, 蘇美禎, 49, 2, 全18週, 2.00, 專業選修(系所), F412, 5, 6,7, 本課程以性別...</p>
-          </div>
-
-          {/* 系所選擇 */}
-          <div className="mb-4">
-            <label className="block text-sm font-bold text-gray-700 mb-2">
-              預設系所（當 Excel 沒有系所欄位時使用）
-            </label>
-            <select
-              value={importDepartment}
-              onChange={(e) => setImportDepartment(e.target.value)}
-              className="w-full px-4 py-2.5 border-2 border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
-              disabled={importLoading}
-            >
-              {departmentOptions.map(dept => (
-                <option key={dept.value} value={dept.value}>
-                  {dept.label}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500 mt-1">
-              💡 如果 Excel 有「開課系所」欄位，會優先使用 Excel 中的系所
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <label className="flex-1">
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileImport}
-                disabled={importLoading}
-                className="hidden"
-                id="xlsx-upload"
-              />
-              <div className="flex items-center justify-center px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium cursor-pointer hover:bg-indigo-700 transition-colors disabled:bg-gray-400">
-                {importLoading ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    匯入中...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    選擇 XLSX 檔案匯入
-                  </>
-                )}
-              </div>
-            </label>
-          </div>
-
-          {/* 匯入結果顯示 */}
-          {importResults && (
-            <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
-              <h4 className="font-bold text-gray-700 mb-2">匯入結果：</h4>
-              <div className="space-y-1 text-sm">
-                <p>總筆數：<span className="font-semibold">{importResults.total}</span></p>
-                <p className="text-green-600">成功：<span className="font-semibold">{importResults.success}</span> 筆</p>
-                <p className="text-red-600">失敗：<span className="font-semibold">{importResults.failed}</span> 筆</p>
-              </div>
-              
-              {importResults.errors.length > 0 && (
-                <div className="mt-3 max-h-40 overflow-y-auto">
-                  <p className="font-semibold text-red-600 mb-1">錯誤訊息：</p>
-                  <ul className="text-xs text-red-500 space-y-1">
-                    {importResults.errors.map((error, idx) => (
-                      <li key={idx}>• {error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+        <div className="flex justify-between items-center mb-6 border-b pb-3">
+          <h2 className="text-2xl font-bold text-gray-800">
+            {isEditMode ? '修改課程' : '新增課程'}
+          </h2>
+          {isEditMode && (
+            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+              編輯模式
+            </span>
           )}
         </div>
+        
+        {/* Excel 匯入區塊 - 僅在新增模式顯示 */}
+        {!isEditMode && (
+          <div className="mb-8 bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-lg border-2 border-indigo-200">
+            <h3 className="text-lg font-bold text-gray-700 mb-3 flex items-center">
+              <svg className="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              批次匯入課程（XLSX）
+            </h3>
+            
+            <div className="mb-4 text-sm text-gray-600 bg-white p-3 rounded border border-gray-200">
+              <p className="font-semibold mb-2">📋 檔案格式說明：</p>
+              <p className="mb-1">欄位順序：學期、主開課教師姓名、核心四碼、年級、科目中文名稱、授課教師姓名、上課人數、學分數、上課週次、上課時數/週、課別名稱、上課地點、上課星期、上課節次、課程中文摘要</p>
+              <p className="text-xs text-gray-500 mt-2">範例：1141, 蘇美禎, 1041, 1, 性別與健康照護, 蘇美禎, 49, 2, 全18週, 2.00, 專業選修(系所), F412, 5, 6,7, 本課程以性別...</p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                預設系所（當 Excel 沒有系所欄位時使用）
+              </label>
+              <select
+                value={importDepartment}
+                onChange={(e) => setImportDepartment(e.target.value)}
+                className="w-full px-4 py-2.5 border-2 border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                disabled={importLoading}
+              >
+                {departmentOptions.map(dept => (
+                  <option key={dept.value} value={dept.value}>
+                    {dept.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                💡 如果 Excel 有「開課系所」欄位，會優先使用 Excel 中的系所
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <label className="flex-1">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileImport}
+                  disabled={importLoading}
+                  className="hidden"
+                  id="xlsx-upload"
+                />
+                <div className="flex items-center justify-center px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium cursor-pointer hover:bg-indigo-700 transition-colors disabled:bg-gray-400">
+                  {importLoading ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      匯入中...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      選擇 XLSX 檔案匯入
+                    </>
+                  )}
+                </div>
+              </label>
+            </div>
+
+            {importResults && (
+              <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+                <h4 className="font-bold text-gray-700 mb-2">匯入結果：</h4>
+                <div className="space-y-1 text-sm">
+                  <p>總筆數：<span className="font-semibold">{importResults.total}</span></p>
+                  <p className="text-green-600">成功：<span className="font-semibold">{importResults.success}</span> 筆</p>
+                  <p className="text-red-600">失敗：<span className="font-semibold">{importResults.failed}</span> 筆</p>
+                </div>
+                
+                {importResults.errors.length > 0 && (
+                  <div className="mt-3 max-h-40 overflow-y-auto">
+                    <p className="font-semibold text-red-600 mb-1">錯誤訊息：</p>
+                    <ul className="text-xs text-red-500 space-y-1">
+                      {importResults.errors.map((error, idx) => (
+                        <li key={idx}>• {error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mb-6 border-t-2 border-gray-200 pt-6">
-          <h3 className="text-lg font-bold text-gray-700 mb-4">或手動新增單一課程</h3>
+          <h3 className="text-lg font-bold text-gray-700 mb-4">
+            {isEditMode ? '修改課程資料' : '或手動新增單一課程'}
+          </h3>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -714,7 +763,7 @@ export default function CreateCourse() {
                   value={formData.academic_year}
                   onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                  placeholder="例如：113"
+                  placeholder="例如：114"
                 />
               </div>
 
@@ -897,15 +946,25 @@ export default function CreateCourse() {
               disabled={loading}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-bold text-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {loading ? '建立中...' : '建立課程'}
+              {loading ? (isEditMode ? '更新中...' : '建立中...') : (isEditMode ? '更新課程' : '建立課程')}
             </button>
-            <button
-              type="button"
-              onClick={handleReset}
-              className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 px-6 rounded-lg font-bold text-lg transition-colors"
-            >
-              清空表單
-            </button>
+            {isEditMode ? (
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 px-6 rounded-lg font-bold text-lg transition-colors"
+              >
+                取消編輯
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleReset}
+                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 px-6 rounded-lg font-bold text-lg transition-colors"
+              >
+                清空表單
+              </button>
+            )}
           </div>
         </form>
       </div>

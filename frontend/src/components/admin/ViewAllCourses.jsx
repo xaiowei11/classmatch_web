@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 
-export default function ViewAllCourses() {
+export default function ViewAllCourses({ onEdit }) {
   const [courses, setCourses] = useState([])
   const [filteredCourses, setFilteredCourses] = useState([])
   const [selectedDepartment, setSelectedDepartment] = useState('all')
@@ -68,6 +68,13 @@ export default function ViewAllCourses() {
     } catch (error) {
       console.error('刪除課程失敗:', error)
       alert('刪除失敗，請稍後再試')
+    }
+  }
+
+  const handleEdit = (courseId) => {
+    console.log('觸發編輯課程 ID:', courseId)
+    if (onEdit) {
+      onEdit(courseId)
     }
   }
 
@@ -253,13 +260,13 @@ export default function ViewAllCourses() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                     <button 
-                      className="text-blue-600 hover:text-blue-900"
-                      onClick={() => {/* TODO: 實作修改功能 */}}
+                      className="text-blue-600 hover:text-blue-900 transition-colors"
+                      onClick={() => handleEdit(course.id)}
                     >
                       修改
                     </button>
                     <button 
-                      className="text-red-600 hover:text-red-900"
+                      className="text-red-600 hover:text-red-900 transition-colors"
                       onClick={() => handleDelete(course.id, course.course_name)}
                     >
                       刪除

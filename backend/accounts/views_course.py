@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 課程相關的 API views
 包含課程搜尋、選課、退選、收藏等功能
@@ -22,25 +23,19 @@ def search_courses(request):
             department = request.GET.get('department', '').strip()
             course_type = request.GET.get('course_type', '').strip()
             semester = request.GET.get('semester', '').strip()
+            weekday = request.GET.get('weekday', '').strip()
             grade_level = request.GET.get('grade_level', '').strip()
             academic_year = request.GET.get('academic_year', '114')
-            # 複選參數（可能有多個值）
-            weekdays = request.GET.getlist('weekdays')
-            periods = request.GET.getlist('periods')
         else:  # POST
             keyword = request.data.get('keyword', '').strip()
             department = request.data.get('department', '').strip()
             course_type = request.data.get('course_type', '').strip()
             semester = request.data.get('semester', '').strip()
+            weekday = request.data.get('weekday', '').strip()
             grade_level = request.data.get('grade_level', '').strip()
             academic_year = request.data.get('academic_year', '114')
-            # 複選參數
-            weekdays = request.data.get('weekdays', [])
-            periods = request.data.get('periods', [])
         
-        print(f"搜尋條件: keyword={keyword}, department={department}, course_type={course_type}, "
-              f"semester={semester}, weekdays={weekdays}, periods={periods}, "
-              f"grade_level={grade_level}, academic_year={academic_year}")
+        print(f"搜尋條件: keyword={keyword}, department={department}, course_type={course_type}, semester={semester}, weekday={weekday}, grade_level={grade_level}, academic_year={academic_year}")
         
         # 基本查詢：取得所有開課資料
         offerings = CourseOffering.objects.select_related(
@@ -65,25 +60,9 @@ def search_courses(request):
         if grade_level:
             offerings = offerings.filter(grade_level=int(grade_level))
         
-        # 複選星期篩選
-        if weekdays and len(weekdays) > 0:
-            # 找出至少符合其中一個星期的課程
-            offerings = offerings.filter(class_times__weekday__in=weekdays).distinct()
+        if weekday:
+            offerings = offerings.filter(class_times__weekday=weekday).distinct()
         
-        # 複選節次篩選
-        if periods and len(periods) > 0:
-            # 找出上課時段與選定節次有重疊的課程
-            period_query = Q()
-            for period in periods:
-                period_int = int(period)
-                # 檢查 start_period <= period <= end_period
-                period_query |= Q(
-                    class_times__start_period__lte=period_int,
-                    class_times__end_period__gte=period_int
-                )
-            offerings = offerings.filter(period_query).distinct()
-        
-        # 關鍵字搜尋（課程代碼、課程名稱、教師姓名）
         if keyword:
             offerings = offerings.filter(
                 Q(course__course_name__icontains=keyword) |
@@ -149,15 +128,14 @@ def search_courses(request):
         return Response({'error': str(e)}, status=500)
 
 
-#csrf_exempt
 @api_view(['POST'])
-def enroll_course(request, course_id):  # ← 加上 course_id 參數
+def enroll_course(request, course_id):
     """選課"""
     try:
         if not request.user.is_authenticated:
             return Response({'error': '請先登入'}, status=401)
         
-        offering_id = course_id  # ← 直接用 course_id
+        offering_id = course_id
         
         if not offering_id:
             return Response({'error': '缺少開課 ID'}, status=400)
@@ -204,15 +182,14 @@ def enroll_course(request, course_id):  # ← 加上 course_id 參數
         return Response({'error': str(e)}, status=500)
 
 
-#@csrf_exempt
 @api_view(['POST'])
-def drop_course(request, course_id):  # ← 加上 course_id 參數
+def drop_course(request, course_id):
     """退選"""
     try:
         if not request.user.is_authenticated:
             return Response({'error': '請先登入'}, status=401)
         
-        offering_id = course_id  # ← 直接用 course_id
+        offering_id = course_id
         
         if not offering_id:
             return Response({'error': '缺少開課 ID'}, status=400)
@@ -249,16 +226,13 @@ def drop_course(request, course_id):  # ← 加上 course_id 參數
 
 
 @api_view(['GET'])
-# 移除這兩行認證裝飾器，改用手動檢查
-# @authentication_classes([SessionAuthentication]) 
-# @permission_classes([IsAuthenticated])
 def get_enrolled_courses(request):
     """取得已選課程"""
     try:
         # 手動檢查登入狀態
         if not request.user.is_authenticated:
             print("使用者未登入")
-            return Response([], status=200)  # 返回空陣列而不是錯誤
+            return Response([], status=200)
         
         print(f"取得 {request.user.username} 的選課記錄")
         
@@ -316,14 +290,13 @@ def get_enrolled_courses(request):
 
 
 @api_view(['POST'])
-def toggle_favorite(request, course_id):  # ← 加上 course_id 參數
+def toggle_favorite(request, course_id):
     """收藏/取消收藏課程"""
     try:
         if not request.user.is_authenticated:
             return Response({'error': '請先登入'}, status=401)
         
-        # 從 URL 參數取得 offering_id
-        offering_id = course_id  # ← 這裡直接用 course_id（其實是 offering_id）
+        offering_id = course_id
         
         if not offering_id:
             return Response({'error': '缺少開課 ID'}, status=400)
@@ -414,7 +387,6 @@ def get_favorite_courses(request):
         return Response({'error': str(e)}, status=500)
 
 
-#@csrf_exempt
 @api_view(['POST'])
 def import_courses_excel(request):
     """從 Excel 匯入課程"""
@@ -446,11 +418,7 @@ def import_courses_excel(request):
                     if not row[0]:  # 跳過空行
                         continue
                     
-                    (學年度, 學期, 課程代碼, 班級, 課程名稱, 授課教師,
-                     必選修, 學分數, 星期, 節次, 上課教室,
-                     上課週次, 每週時數, 人數上限, 備註) = row[:15]
-                    
-                    # ... 處理邏輯
+                    # 處理邏輯
                     success_count += 1
                     
                 except Exception as e:
@@ -464,11 +432,7 @@ def import_courses_excel(request):
                     if not row[0]:
                         continue
                     
-                    (學年度, 學期, 課程代碼, 班級, 課程名稱, 授課教師,
-                     必選修, 學分數, 星期, 節次, 上課教室,
-                     上課週次, 每週時數, 人數上限, 系所, 備註) = row[:16]
-                    
-                    # ... 處理邏輯
+                    # 處理邏輯
                     success_count += 1
                     
                 except Exception as e:
@@ -494,6 +458,7 @@ def import_courses_excel(request):
         import traceback
         traceback.print_exc()
         return Response({'error': str(e)}, status=500)
+
 
 @api_view(['GET'])
 def get_filter_options(request):
@@ -551,4 +516,130 @@ def get_filter_options(request):
         
     except Exception as e:
         print(f"取得篩選選項錯誤: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+def get_course_detail(request, course_id):
+    """取得單一課程詳細資料（用於編輯）"""
+    try:
+        offering = CourseOffering.objects.select_related(
+            'course', 'department'
+        ).prefetch_related(
+            'offering_teachers__teacher__profile',
+            'class_times'
+        ).get(id=course_id)
+        
+        # 取得上課時段（取第一個時段）
+        class_time = offering.class_times.first()
+        
+        # 取得主教師
+        main_teacher = offering.offering_teachers.filter(role='main').first()
+        
+        course_data = {
+            'id': offering.id,
+            'course_code': offering.course.course_code,
+            'course_name': offering.course.course_name,
+            'course_type': offering.course.course_type,
+            'description': offering.course.description or '',
+            'credits': offering.course.credits,
+            'hours': offering.course.credits,  # 假設小時數等於學分數
+            'academic_year': offering.academic_year,
+            'semester': offering.semester,
+            'department': offering.department.name,
+            'grade_level': str(offering.grade_level),
+            'teacher_id': str(main_teacher.teacher.id) if main_teacher else '',
+            'classroom': class_time.classroom if class_time else '',
+            'weekday': class_time.weekday if class_time else '1',
+            'start_period': str(class_time.start_period) if class_time else '1',
+            'end_period': str(class_time.end_period) if class_time else '2',
+            'max_students': offering.max_students,
+        }
+        
+        return Response(course_data)
+        
+    except CourseOffering.DoesNotExist:
+        return Response({'error': '找不到該課程'}, status=404)
+    except Exception as e:
+        print(f"取得課程詳情錯誤: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['PUT'])
+def update_course(request, course_id):
+    """更新課程資料"""
+    try:
+        # 取得開課資料
+        offering = CourseOffering.objects.select_related('course').get(id=course_id)
+        course = offering.course
+        
+        # 更新課程基本資料
+        course.course_code = request.data.get('course_code', course.course_code)
+        course.course_name = request.data.get('course_name', course.course_name)
+        course.course_type = request.data.get('course_type', course.course_type)
+        course.description = request.data.get('description', course.description)
+        course.credits = request.data.get('credits', course.credits)
+        course.save()
+        
+        # 更新開課資料
+        offering.academic_year = request.data.get('academic_year', offering.academic_year)
+        offering.semester = request.data.get('semester', offering.semester)
+        offering.grade_level = request.data.get('grade_level', offering.grade_level)
+        offering.max_students = request.data.get('max_students', offering.max_students)
+        
+        # 更新系所
+        from .models import Department
+        department_name = request.data.get('department')
+        if department_name:
+            department, _ = Department.objects.get_or_create(name=department_name)
+            offering.department = department
+        
+        offering.save()
+        
+        # 更新教師
+        teacher_id = request.data.get('teacher_id')
+        if teacher_id:
+            from .models import OfferingTeacher
+            # 刪除舊的教師關聯
+            offering.offering_teachers.all().delete()
+            # 新增新的教師關聯
+            teacher = User.objects.get(id=teacher_id)
+            OfferingTeacher.objects.create(
+                offering=offering,
+                teacher=teacher,
+                role='main'
+            )
+        
+        # 更新上課時段
+        classroom = request.data.get('classroom')
+        weekday = request.data.get('weekday')
+        start_period = request.data.get('start_period')
+        end_period = request.data.get('end_period')
+        
+        if all([classroom, weekday, start_period, end_period]):
+            from .models import ClassTime
+            # 刪除舊的時段
+            offering.class_times.all().delete()
+            # 新增新的時段
+            ClassTime.objects.create(
+                offering=offering,
+                weekday=weekday,
+                start_period=start_period,
+                end_period=end_period,
+                classroom=classroom
+            )
+        
+        print(f"課程更新成功: {course.course_name}")
+        return Response({'message': '課程更新成功'})
+        
+    except CourseOffering.DoesNotExist:
+        return Response({'error': '找不到該課程'}, status=404)
+    except User.DoesNotExist:
+        return Response({'error': '找不到該教師'}, status=404)
+    except Exception as e:
+        print(f"更新課程錯誤: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return Response({'error': str(e)}, status=500)

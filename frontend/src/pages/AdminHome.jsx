@@ -8,6 +8,7 @@ import ViewAllAccounts from '../components/admin/ViewAllaccounts'
 
 export default function AdminHome() {
   const [activeTab, setActiveTab] = useState('viewCourses') // 預設為查看課程
+  const [editingCourseId, setEditingCourseId] = useState(null) // 正在編輯的課程 ID
   const navigate = useNavigate()
   
   const username = localStorage.getItem('username') || '管理員'
@@ -36,18 +37,32 @@ export default function AdminHome() {
     { id: 'viewAccounts', label: '查看帳號', category: 'accounts' },
   ]
 
+  // 處理編輯課程
+  const handleEditCourse = (courseId) => {
+    console.log('開始編輯課程 ID:', courseId)
+    setEditingCourseId(courseId)
+    setActiveTab('createCourse')
+  }
+
+  // 處理保存完成後
+  const handleSaveComplete = () => {
+    console.log('課程保存完成，返回課程列表')
+    setEditingCourseId(null)
+    setActiveTab('viewCourses')
+  }
+
   const renderContent = () => {
     switch (activeTab) {
       case 'viewCourses':
-        return <ViewAllCourses />
+        return <ViewAllCourses onEdit={handleEditCourse} />
       case 'createCourse':
-        return <CreateCourse />
+        return <CreateCourse editingCourseId={editingCourseId} onSaveComplete={handleSaveComplete} />
       case 'register':
         return <RegisterAccount />
       case 'viewAccounts':
         return <ViewAllAccounts />
       default:
-        return <ViewAllCourses />
+        return <ViewAllCourses onEdit={handleEditCourse} />
     }
   }
 
@@ -88,7 +103,13 @@ export default function AdminHome() {
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setActiveTab(item.id)
+                // 切換分頁時，如果不是去新增課程頁面，則清除編輯狀態
+                if (item.id !== 'createCourse') {
+                  setEditingCourseId(null)
+                }
+              }}
               className={`flex-1 py-4 px-6 text-center font-bold text-lg transition-colors ${
                 activeTab === item.id
                   ? 'bg-blue-400 text-gray-900'
