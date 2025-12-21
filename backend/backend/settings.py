@@ -85,6 +85,9 @@ else:
 
 CSRF_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
 CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = False  # ← 新增：允許 JavaScript 讀取 CSRF token
+CSRF_USE_SESSIONS = False  # ← 新增：使用 Cookie 而不是 Session 儲存 CSRF token
+CSRF_COOKIE_NAME = 'csrftoken'  # ← 新增：明確指定 cookie 名稱
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
