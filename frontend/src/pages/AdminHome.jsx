@@ -5,6 +5,7 @@ import RegisterAccount from '../components/admin/RegisterAccount'
 import CreateCourse from '../components/admin/CreateCourse'
 import ViewAllCourses from '../components/admin/ViewAllCourses'
 import ViewAllAccounts from '../components/admin/ViewAllaccounts'
+import { API_ENDPOINTS } from '../config/api'
 
 export default function AdminHome() {
   const [activeTab, setActiveTab] = useState('viewCourses') // 預設為查看課程
@@ -16,7 +17,7 @@ export default function AdminHome() {
 
   const handleLogout = async () => {
     try {
-      await axios.post('http://localhost:8000/api/logout/', {}, {
+      await axios.post(API_ENDPOINTS.logout, {}, {
         withCredentials: true
       })
     } catch (error) {

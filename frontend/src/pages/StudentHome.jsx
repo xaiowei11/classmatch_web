@@ -5,6 +5,7 @@ import MyCourses from '../components/student/MyCourses'
 import SearchCourses from '../components/student/SearchCourses'
 import CourseSelection from '../components/student/CourseSelection'
 import AccountManagement from '../components/student/AccountManagement'
+import { API_ENDPOINTS } from '../config/api'
 
 export default function StudentHome() {
   const [activeTab, setActiveTab] = useState('myCourses')
@@ -18,7 +19,7 @@ export default function StudentHome() {
   const handleLogout = async () => {
     try {
       // 先呼叫後端登出 API
-      await axios.post('http://localhost:8000/api/logout/', {}, {
+      await axios.post(API_ENDPOINTS.logout, {}, {
         withCredentials: true
       })
     } catch (error) {

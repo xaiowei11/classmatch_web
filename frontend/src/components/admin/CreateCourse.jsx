@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import * as XLSX from 'xlsx'
+import API_BASE_URL, { API_ENDPOINTS } from '../../config/api'
 
 export default function CreateCourse({ editingCourseId, onSaveComplete }) {
   const [formData, setFormData] = useState({
@@ -49,7 +50,7 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
   const fetchCourseDetail = async (courseId) => {
     try {
       setLoading(true)
-      const response = await axios.get(`http://localhost:8000/api/courses/${courseId}/detail/`)
+      const response = await axios.get(API_ENDPOINTS.courseDetail(courseId))
       setFormData(response.data)
       console.log('載入課程資料成功:', response.data)
     } catch (error) {
@@ -62,7 +63,7 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
 
   const fetchTeachers = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/teachers/')
+      const response = await axios.get(API_ENDPOINTS.teachers)
       setTeachers(response.data)
     } catch (error) {
       console.error('載入教師列表失敗:', error)
@@ -161,11 +162,11 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
 
       if (isEditMode && editingCourseId) {
         // 更新模式
-        await axios.put(`http://localhost:8000/api/courses/${editingCourseId}/update/`, submitData)
+        await axios.put(API_ENDPOINTS.courseUpdate(editingCourseId), submitData)
         alert('課程更新成功!')
       } else {
         // 新增模式
-        await axios.post('http://localhost:8000/api/courses/create/', submitData)
+        await axios.post(API_ENDPOINTS.coursesCreate, submitData)
         alert('課程建立成功!')
       }
       
@@ -502,7 +503,7 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
           console.log(`準備建立課程: ${courseName}`)
 
           // 送出到後端
-          await axios.post('http://localhost:8000/api/courses/create/', courseData)
+          await axios.post(API_ENDPOINTS.coursesCreate, courseData)
           results.success++
           console.log(`成功建立課程: ${courseName}`)
 

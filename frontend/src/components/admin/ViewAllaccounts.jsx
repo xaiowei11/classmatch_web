@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import { API_ENDPOINTS } from '../../config/api'
 
 // 獲取 CSRF token 的函數
 function getCookie(name) {
@@ -32,8 +33,8 @@ export default function ViewAllAccounts() {
     setLoading(true)
     try {
       const endpoint = accountType === 'student' 
-        ? 'http://localhost:8000/api/students/'
-        : 'http://localhost:8000/api/teachers/'
+        ? API_ENDPOINTS.students
+        : API_ENDPOINTS.teachers
       
       const response = await axios.get(endpoint, {
         withCredentials: true
@@ -57,7 +58,9 @@ export default function ViewAllAccounts() {
       const csrftoken = getCookie('csrftoken');
       
       await axios.delete(
-        `http://localhost:8000/api/${accountType}s/${accountId}/delete/`,
+        accountType === 'student' 
+            ? API_ENDPOINTS.studentDelete(accountId)
+            : API_ENDPOINTS.teacherDelete(accountId),
         { 
           withCredentials: true,
           headers: {
@@ -110,7 +113,9 @@ export default function ViewAllAccounts() {
       const csrftoken = getCookie('csrftoken');
       
       await axios.put(
-        `http://localhost:8000/api/${accountType}s/${accountId}/update/`,
+        accountType === 'student'
+            ? API_ENDPOINTS.studentUpdate(accountId)
+            : API_ENDPOINTS.teacherUpdate(accountId),
         editFormData,
         { 
           withCredentials: true,

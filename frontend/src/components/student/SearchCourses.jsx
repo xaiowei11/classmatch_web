@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import API_BASE_URL from '../../config/api'
+
 
 function getCookie(name) {
   let cookieValue = null;
@@ -37,7 +39,7 @@ export default function SearchCourses() {
     label: `第${i + 1}節`
   }))
 
-  const API_BASE_URL = 'http://localhost:8000/api'
+  //const API_BASE_URL = 'http://localhost:8000/api'
 
   useEffect(() => {
     fetchFilterOptions()

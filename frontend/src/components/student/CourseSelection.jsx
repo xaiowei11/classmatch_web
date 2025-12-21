@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import API_BASE_URL from '../../config/api'
+
 
 function getCookie(name) {
   let cookieValue = null;
@@ -33,7 +35,7 @@ export default function CourseSelection() {
   const [activeTab, setActiveTab] = useState('enrolled') // 新增：當前分頁 ('enrolled' 或 'search')
 
   // API 基礎 URL
-  const API_BASE_URL = 'http://localhost:8000/api'
+  //const API_BASE_URL = 'http://localhost:8000/api'
 
   // 獲取篩選選項和已選課程
   useEffect(() => {

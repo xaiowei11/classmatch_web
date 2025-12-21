@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import schoolLogo from '../images/maxresdefault.jpg'
+import { API_ENDPOINTS } from '../config/api'
 
 function getCookie(name) {
   let cookieValue = null;
@@ -32,7 +33,7 @@ export default function LoginPage() {
   const fetchCSRFToken = async () => {
     try {
       // 訪問任意 GET 端點來獲取 CSRF token
-      await axios.get('http://localhost:8000/api/courses/filter-options/', {
+      await axios.get(API_ENDPOINTS.filterOptions, {
         withCredentials: true
       })
       console.log('CSRF token 已獲取')
@@ -46,7 +47,7 @@ export default function LoginPage() {
       const csrfToken = getCookie('csrftoken')
       console.log('CSRF Token:', csrfToken)
       
-      const res = await axios.post('http://localhost:8000/api/login/', {
+      const res = await axios.post(API_ENDPOINTS.login, {
         username, password
       }, {
         withCredentials: true,

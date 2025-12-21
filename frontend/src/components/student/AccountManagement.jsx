@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import API_BASE_URL from '../../config/api'
 
 export default function AccountManagement() {
   const [userInfo, setUserInfo] = useState(null)
@@ -22,7 +23,7 @@ export default function AccountManagement() {
   const fetchUserData = async () => {
     try {
       setLoading(true)
-      const response = await axios.get('http://localhost:8000/api/user/credit-summary/', {
+      const response = await axios.get(API_ENDPOINTS.creditSummary, {
         withCredentials: true  // ← 重要：允許傳送 cookie
       })
       

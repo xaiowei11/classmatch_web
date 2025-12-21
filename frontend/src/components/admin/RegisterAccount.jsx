@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import axios from 'axios'
+import { API_ENDPOINTS } from '../../config/api'
+
 
 export default function RegisterAccount() {
   const [formData, setFormData] = useState({
@@ -127,7 +129,7 @@ export default function RegisterAccount() {
         submitData.title = formData.title
       }
 
-      await axios.post('http://localhost:8000/api/register/', submitData)
+      await axios.post(API_ENDPOINTS.register, submitData)
       
       alert(`${formData.role === 'student' ? '學生' : '教師'}帳號建立成功！`)
       

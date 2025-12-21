@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import { API_ENDPOINTS } from '../../config/api'
 
 export default function ViewAllCourses({ onEdit }) {
   const [courses, setCourses] = useState([])
@@ -26,7 +27,7 @@ export default function ViewAllCourses({ onEdit }) {
   const fetchCourses = async () => {
     setLoading(true)
     try {
-      const response = await axios.get('http://localhost:8000/api/courses')
+      const response = await axios.get(API_ENDPOINTS.courses)
       setCourses(response.data)
     } catch (error) {
       console.error('載入課程失敗:', error)
@@ -62,7 +63,7 @@ export default function ViewAllCourses({ onEdit }) {
     }
 
     try {
-      await axios.delete(`http://localhost:8000/api/courses/${courseId}/delete/`)
+      await axios.delete(API_ENDPOINTS.courseDelete(courseId))
       alert('課程刪除成功！')
       fetchCourses()
     } catch (error) {
