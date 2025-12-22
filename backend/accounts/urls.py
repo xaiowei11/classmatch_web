@@ -4,7 +4,7 @@ Django URL 配置
 整合所有分離的 views 模組
 """
 from django.urls import path
-from . import views_auth, views_student, views_admin, views_course, views_account
+from . import views_auth, views_student, views_admin, views_course, views_account, views_debug
 
 urlpatterns = [
     # ===== 認證相關 API =====
@@ -42,6 +42,8 @@ urlpatterns = [
     path('teachers/<int:user_id>/update/', views_account.update_teacher, name='update_teacher'),
     path('students/<int:user_id>/delete/', views_account.delete_student, name='delete_student'),
     path('teachers/<int:user_id>/delete/', views_account.delete_teacher, name='delete_teacher'),
+
+    path('debug-settings/', views_debug.debug_settings, name='debug_settings'),
     
     # ===== 這個必須放在最後，因為它會匹配所有 courses/ =====
     path('courses/', views_admin.get_all_courses, name='get_all_courses'),

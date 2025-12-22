@@ -36,7 +36,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # ← 新增這行
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -48,7 +48,6 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'backend.urls'
 
 # ===== 修改 5: CORS 支持環境變量 =====
-# 開發環境的默認值
 default_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -56,7 +55,6 @@ default_origins = [
     "http://127.0.0.1:3000",
 ]
 
-# 生產環境可以通過環境變量添加
 env_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
 if env_origins:
     CORS_ALLOWED_ORIGINS = env_origins.split(',')
@@ -68,9 +66,9 @@ CORS_ALLOW_CREDENTIALS = True
 # ===== 修改 6: Session 設定支持生產環境 =====
 SESSION_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = not DEBUG  # 生產環境自動設為 True
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_DOMAIN = None  # ← 新增：不限制域名
 SESSION_COOKIE_AGE = 86400
-SESSION_COOKIE_DOMAIN = None
 
 # ===== 修改 7: CSRF 設定支持環境變量 =====
 default_csrf_origins = [
@@ -86,10 +84,10 @@ else:
 
 CSRF_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
 CSRF_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_HTTPONLY = False  # ← 新增：允許 JavaScript 讀取 CSRF token
-SESSION_COOKIE_DOMAIN = None
-CSRF_USE_SESSIONS = False  # ← 新增：使用 Cookie 而不是 Session 儲存 CSRF token
-CSRF_COOKIE_NAME = 'csrftoken'  # ← 新增：明確指定 cookie 名稱
+CSRF_COOKIE_HTTPONLY = False  # ← 關鍵！必須是 False，允許 JavaScript 讀取
+CSRF_COOKIE_DOMAIN = None  # ← 新增：不限制域名
+CSRF_USE_SESSIONS = False  # ← 新增：使用 Cookie 而不是 Session
+CSRF_COOKIE_NAME = 'csrftoken'  # ← 新增：明確指定名稱
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -118,13 +116,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
-
 # ===== 修改 8: 數據庫配置支持 PostgreSQL =====
-# Render 會提供 DATABASE_URL 環境變量
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 if DATABASE_URL:
-    # 生產環境使用 PostgreSQL (Render 提供)
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
@@ -133,14 +128,12 @@ if DATABASE_URL:
         )
     }
 else:
-    # 本地開發使用 SQLite
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -158,18 +151,13 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = 'zh-hant'
-
 TIME_ZONE = 'Asia/Taipei'
-
 USE_I_18N = True
-
 USE_TZ = True
 
 # ===== 修改 9: 靜態文件配置 =====
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'  # ← 新增
-
-# WhiteNoise 配置
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'  # ← 新增
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
