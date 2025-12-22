@@ -10,3 +10,6 @@ __pycache__/
 
 backend/accounts/__pycache__/*.pyc
 backend/data_backup.json
+
+backend/staticfiles/*
+backend/.env

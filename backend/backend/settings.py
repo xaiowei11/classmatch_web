@@ -5,16 +5,24 @@ import dj_database_url
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ===== 修改 1: 使用環境變量 =====
+# ===== 智能檢測環境 =====
+# 如果有 DATABASE_URL，表示是生產環境（Render）
+IS_PRODUCTION = bool(os.environ.get('DATABASE_URL'))
+
+# SECRET_KEY
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-yh=a&t#9kri&a_#!!_$fu9q2$f)za^g8o$6b=bai-b3aot%+*j')
 
-# ===== 修改 2: DEBUG 使用環境變量 =====
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+# DEBUG 設置
+if IS_PRODUCTION:
+    # 生產環境：強制關閉 DEBUG
+    DEBUG = False
+else:
+    # 本地開發：預設開啟 DEBUG（除非明確設置為 False）
+    DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-# ===== 修改 3: ALLOWED_HOSTS 使用環境變量 =====
+# ALLOWED_HOSTS
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
-# Render 會自動添加這個環境變量
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
@@ -63,14 +71,20 @@ else:
 
 CORS_ALLOW_CREDENTIALS = True
 
-# ===== 修改 6: Session 設定支持生產環境 =====
-SESSION_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
+# Session 設定（根據環境自動調整）
+if IS_PRODUCTION:
+    SESSION_COOKIE_SAMESITE = "None"
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_DOMAIN = '.onrender.com'
+else:
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = False
+    SESSION_COOKIE_DOMAIN = None
+
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = not DEBUG
-SESSION_COOKIE_DOMAIN = '.onrender.com' if not DEBUG else None  # ← 新增：不限制域名
 SESSION_COOKIE_AGE = 86400
 
-# ===== 修改 7: CSRF 設定支持環境變量 =====
+# CSRF 設定（根據環境自動調整）
 default_csrf_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -82,12 +96,18 @@ if env_csrf_origins:
 else:
     CSRF_TRUSTED_ORIGINS = default_csrf_origins
 
-CSRF_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
-CSRF_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_HTTPONLY = False  # ← 關鍵！必須是 False，允許 JavaScript 讀取
-CSRF_COOKIE_DOMAIN = '.onrender.com' if not DEBUG else None # ← 新增：不限制域名
-CSRF_USE_SESSIONS = False  # ← 新增：使用 Cookie 而不是 Session
-CSRF_COOKIE_NAME = 'csrftoken'  # ← 新增：明確指定名稱
+if IS_PRODUCTION:
+    CSRF_COOKIE_SAMESITE = "None"
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_DOMAIN = '.onrender.com'
+else:
+    CSRF_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SECURE = False
+    CSRF_COOKIE_DOMAIN = None
+
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_NAME = 'csrftoken'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

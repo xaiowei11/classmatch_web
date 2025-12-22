@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { API_ENDPOINTS } from '../../config/api'
 
@@ -6,6 +7,8 @@ export default function AccountManagement() {
   const [userInfo, setUserInfo] = useState(null)
   const [creditSummary, setCreditSummary] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const navigate = useNavigate()
 
   // 學分要求
   const requirements = {
@@ -23,9 +26,16 @@ export default function AccountManagement() {
   const fetchUserData = async () => {
     try {
       setLoading(true)
+      setError(null)
+      
+      console.log('開始獲取學分資料...')
+      console.log('Cookies:', document.cookie)
+      
       const response = await axios.get(API_ENDPOINTS.creditSummary, {
-        withCredentials: true  // ← 重要：允許傳送 cookie
+        withCredentials: true
       })
+      
+      console.log('✅ 學分資料獲取成功:', response.data)
       
       const data = response.data
       
@@ -37,7 +47,16 @@ export default function AccountManagement() {
       
       setLoading(false)
     } catch (error) {
-      console.error('獲取學分資料失敗', error)
+      console.error('❌ 獲取學分資料失敗:', error)
+      
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setError('請重新登入')
+        localStorage.clear()
+        setTimeout(() => navigate('/'), 2000)
+      } else {
+        setError('無法載入資料')
+      }
+      
       setLoading(false)
     }
   }
@@ -167,10 +186,13 @@ export default function AccountManagement() {
     )
   }
 
-  if (!userInfo || !creditSummary) {
+  if (error) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-2xl text-red-600">無法載入資料</div>
+        <div className="text-center">
+          <div className="text-2xl text-red-600 mb-4">{error}</div>
+          {error.includes('登入') && <div className="text-gray-600">正在跳轉...</div>}
+        </div>
       </div>
     )
   }
