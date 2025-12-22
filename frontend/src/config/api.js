@@ -1,6 +1,8 @@
 // src/config/api.js
 // 統一的 API 配置文件
 
+import axios from 'axios'
+
 // 從環境變量獲取 API URL，如果沒有則使用本地開發地址
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
@@ -9,7 +11,55 @@ const baseURL = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BAS
 
 export default baseURL
 
-// 也可以導出完整的 API 端點
+// ===== 新增：創建配置好的 axios 實例 =====
+export const apiClient = axios.create({
+  baseURL: baseURL,
+  withCredentials: true,  // 自動發送 cookies
+  headers: {
+    'Content-Type': 'application/json',
+  }
+})
+
+// ===== 新增：請求攔截器 - 自動添加 CSRF token =====
+apiClient.interceptors.request.use(
+  (config) => {
+    // 獲取 CSRF token 的函數
+    const getCsrfToken = () => {
+      const name = 'csrftoken'
+      const cookies = document.cookie.split(';')
+      for (let cookie of cookies) {
+        const [key, value] = cookie.trim().split('=')
+        if (key === name) return value
+      }
+      return null
+    }
+
+    const csrfToken = getCsrfToken()
+    if (csrfToken) {
+      config.headers['X-CSRFToken'] = csrfToken
+    }
+
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// ===== 新增：響應攔截器 - 處理錯誤 =====
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 403) {
+      console.error('CSRF 驗證失敗')
+    } else if (error.response?.status === 401) {
+      console.error('未授權，請重新登入')
+    }
+    return Promise.reject(error)
+  }
+)
+
+// API 端點定義
 export const API_ENDPOINTS = {
   // 認證相關
   login: `${baseURL}/login/`,

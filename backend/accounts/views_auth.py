@@ -89,19 +89,34 @@ def login_view(request):
 @csrf_exempt 
 @api_view(['POST'])
 def logout_view(request):
-    """使用者登出"""
+    """使用者登出 - 修正版"""
     try:
-        # 登出使用者（清除 server 端 session）
+        # 1. 登出使用者（清除 server 端 session）
         django_logout(request)
         
-        # 建立 response
-        response = Response({'message': '登出成功'})
+        # 2. 建立 response
+        response = Response({
+            'message': '登出成功',
+            'status': 'success'
+        })
         
-        # 主動刪除 cookies
-        response.delete_cookie('sessionid', domain=None, path='/')
-        response.delete_cookie('csrftoken', domain=None, path='/')
+        # 3. 刪除 sessionid cookie（加上 samesite 參數）
+        response.delete_cookie(
+            'sessionid',
+            path='/',
+            domain=None,
+            samesite='None'  # ← 重要：跨域必須設定
+        )
         
-        # 設定 cache control，確保瀏覽器不會快取
+        # 4. 刪除 csrftoken cookie（加上 samesite 參數）
+        response.delete_cookie(
+            'csrftoken',
+            path='/',
+            domain=None,
+            samesite='None'  # ← 重要：跨域必須設定
+        )
+        
+        # 5. 設定 cache control
         response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response['Pragma'] = 'no-cache'
         response['Expires'] = '0'
@@ -110,4 +125,7 @@ def logout_view(request):
         
     except Exception as e:
         print(f"登出錯誤: {str(e)}")
-        return Response({'error': str(e)}, status=500)
+        return Response({
+            'error': str(e),
+            'status': 'error'
+        }, status=500)
