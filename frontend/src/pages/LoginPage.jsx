@@ -1,23 +1,8 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
+// 關鍵：導入封裝好的 apiClient 與端點定義
+import { API_ENDPOINTS, apiClient } from '../config/api'
 import schoolLogo from '../images/maxresdefault.jpg'
-import { API_ENDPOINTS } from '../config/api'
-
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-}
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -25,59 +10,54 @@ export default function LoginPage() {
   const [roles, setRoles] = useState([])
   const navigate = useNavigate()
 
-  // 組件載入時先獲取 CSRF token
+  // 組件載入時，先發送一個簡單請求獲取 CSRF Cookie (如果後端有設定)
   useEffect(() => {
+    const fetchCSRFToken = async () => {
+      try {
+        // 使用 apiClient 發送，會自動帶上 Credentials
+        await apiClient.get(API_ENDPOINTS.filterOptions)
+        console.log('CSRF Cookie 已初始化')
+      } catch (error) {
+        console.error('初始化 CSRF 失敗:', error)
+      }
+    }
     fetchCSRFToken()
   }, [])
 
-  const fetchCSRFToken = async () => {
-    try {
-      // 訪問任意 GET 端點來獲取 CSRF token
-      await axios.get(API_ENDPOINTS.filterOptions, {
-        withCredentials: true
-      })
-      console.log('CSRF token 已獲取')
-    } catch (error) {
-      console.error('獲取 CSRF token 失敗:', error)
-    }
-  }
-
   const handleLogin = async () => {
     try {
-      const csrfToken = getCookie('csrftoken')
-      console.log('CSRF Token:', csrfToken)
-      
-      const res = await axios.post(API_ENDPOINTS.login, {
-        username, password
-      }, {
-        withCredentials: true,
-        headers: csrfToken ? {
-          'X-CSRFToken': csrfToken
-        } : {}
+      // ✅ 改用 apiClient：不需要手動 getCookie，不需要手動寫 headers
+      // 攔截器會自動幫你補上 X-CSRFToken
+      const res = await apiClient.post(API_ENDPOINTS.login, {
+        username,
+        password
       })
       
-      console.log('後端返回的完整數據：', res.data)
+      console.log('登入成功數據：', res.data)
       
+      const { role, roles: userRoles, real_name } = res.data
+
+      // 儲存用戶資訊
       localStorage.setItem('username', username)
-      if (res.data.real_name) {
-        localStorage.setItem('realName', res.data.real_name)
-      }
+      if (real_name) localStorage.setItem('realName', real_name)
       
-      if (res.data.role) {
-        navigate(`/${res.data.role}home`)
-      } else if (res.data.roles) {
-        setRoles(res.data.roles)
+      // 角色跳轉邏輯
+      if (role) {
+        navigate(`/${role}home`)
+      } else if (userRoles && userRoles.length > 0) {
+        // 如果有多個角色，顯示選擇按鈕
+        setRoles(userRoles)
       }
     } catch (err) {
-      console.error('登入錯誤:', err)
-      alert('登入失敗: ' + (err.response?.data?.error || err.message))
+      console.error('登入報錯:', err)
+      // Axios 的錯誤訊息通常在 err.response.data
+      const message = err.response?.data?.error || err.message
+      alert('登入失敗: ' + message)
     }
   }
   
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleLogin()
-    }
+    if (e.key === 'Enter') handleLogin()
   }
 
   const chooseRole = (r) => {

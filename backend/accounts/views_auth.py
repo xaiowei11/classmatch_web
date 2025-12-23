@@ -4,14 +4,14 @@
 """
 from django.contrib.auth import authenticate, login as django_login, logout as django_logout
 from django.contrib.auth.models import User
-from django.views.decorators.csrf import ensure_csrf_cookie  # ← 修改：移除 csrf_exempt，改用 ensure_csrf_cookie
-from django.middleware.csrf import get_token  # ← 新增：用於取得 CSRF token
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.middleware.csrf import get_token
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import Profile, Role
 
 
-@api_view(['POST'])  # ← 修改：移除 @csrf_exempt
+@api_view(['POST'])
 def register(request):
     """使用者註冊"""
     username = request.data.get('username')
@@ -53,7 +53,7 @@ def register(request):
     return Response({'message': '註冊成功'})
 
 
-@ensure_csrf_cookie  # ← 修改：移除 @csrf_exempt，改用 @ensure_csrf_cookie（這是關鍵！）
+@ensure_csrf_cookie
 @api_view(['POST'])
 def login_view(request):
     """使用者登入"""
@@ -70,9 +70,13 @@ def login_view(request):
         profile = Profile.objects.get(user=user)
         roles = [r.name for r in profile.roles.all()]
         
+        # ✅ 取得 CSRF token
+        csrf_token = get_token(request)
+        
         response_data = {
             'username': username,
             'real_name': profile.real_name,
+            'csrfToken': csrf_token,  # ← 新增：返回 CSRF token
         }
         
         if len(roles) == 1:
@@ -80,42 +84,38 @@ def login_view(request):
         else:
             response_data['roles'] = roles
             
+        print(f"✅ 用戶登入成功: {username}, CSRF Token: {csrf_token[:20]}...")
         return Response(response_data)
         
     except Profile.DoesNotExist:
         return Response({'error': '找不到使用者資料'}, status=404)
 
 
-@api_view(['POST'])  # ← 修改：移除 @csrf_exempt
+@api_view(['POST'])
 def logout_view(request):
-    """使用者登出 - 修正版"""
+    """使用者登出"""
     try:
-        # 1. 登出使用者（清除 server 端 session）
         django_logout(request)
         
-        # 2. 建立 response
         response = Response({
             'message': '登出成功',
             'status': 'success'
         })
         
-        # 3. 刪除 sessionid cookie（加上 samesite 參數）
         response.delete_cookie(
             'sessionid',
             path='/',
-            domain='.onrender.com',  # ← 修改：加上 domain
+            domain='.onrender.com',
             samesite='None'
         )
         
-        # 4. 刪除 csrftoken cookie（加上 samesite 參數）
         response.delete_cookie(
             'csrftoken',
             path='/',
-            domain='.onrender.com',  # ← 修改：加上 domain
+            domain='.onrender.com',
             samesite='None'
         )
         
-        # 5. 設定 cache control
         response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response['Pragma'] = 'no-cache'
         response['Expires'] = '0'

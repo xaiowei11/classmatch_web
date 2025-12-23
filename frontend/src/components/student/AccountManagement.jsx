@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { API_ENDPOINTS } from '../../config/api'
+import { clearCsrfToken } from '../../utils/csrf'  // ← 新增這行
 
 export default function AccountManagement() {
   const [userInfo, setUserInfo] = useState(null)
@@ -29,7 +30,8 @@ export default function AccountManagement() {
       setError(null)
       
       console.log('開始獲取學分資料...')
-      console.log('Cookies:', document.cookie)
+      console.log('LocalStorage Token:', localStorage.getItem('csrftoken'))  // ← 改成檢查 localStorage
+
       
       const response = await axios.get(API_ENDPOINTS.creditSummary, {
         withCredentials: true
@@ -51,7 +53,7 @@ export default function AccountManagement() {
       
       if (error.response?.status === 401 || error.response?.status === 403) {
         setError('請重新登入')
-        localStorage.clear()
+        clearCsrfToken()
         setTimeout(() => navigate('/'), 2000)
       } else {
         setError('無法載入資料')

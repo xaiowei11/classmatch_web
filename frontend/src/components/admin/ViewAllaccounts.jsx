@@ -1,22 +1,24 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { API_ENDPOINTS } from '../../config/api'
+import { getCsrfToken } from '../../utils/csrf'  // ← 新增這行
+
 
 // 獲取 CSRF token 的函數
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-}
+// function getCookie(name) {
+//   let cookieValue = null;
+//   if (document.cookie && document.cookie !== '') {
+//     const cookies = document.cookie.split(';');
+//     for (let i = 0; i < cookies.length; i++) {
+//       const cookie = cookies[i].trim();
+//       if (cookie.substring(0, name.length + 1) === (name + '=')) {
+//         cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+//         break;
+//       }
+//     }
+//   }
+//   return cookieValue;
+// }
 
 export default function ViewAllAccounts() {
   const [accountType, setAccountType] = useState('student') // 'student' or 'teacher'
@@ -64,7 +66,7 @@ export default function ViewAllAccounts() {
         { 
           withCredentials: true,
           headers: {
-            'X-CSRFToken': csrftoken
+            'X-CSRFToken': getCsrfToken()
           }
         }
       )
@@ -120,7 +122,7 @@ export default function ViewAllAccounts() {
         { 
           withCredentials: true,
           headers: {
-            'X-CSRFToken': csrftoken
+            'X-CSRFToken': getCsrfToken()
           }
         }
       )
