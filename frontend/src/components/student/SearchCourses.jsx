@@ -87,7 +87,9 @@ export default function SearchCourses() {
         filters.periods.forEach(period => params.append('periods', period))
       }
       
-      const response = await fetch(`${API_BASE_URL}/courses/search/?${params.toString()}`)
+      const response = await fetch(`${API_BASE_URL}/courses/search/?${params.toString()}`, {
+        credentials: 'include'  // ← 添加這一行
+      })
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }

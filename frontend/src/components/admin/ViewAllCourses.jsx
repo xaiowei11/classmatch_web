@@ -6,6 +6,9 @@ export default function ViewAllCourses({ onEdit }) {
   const [courses, setCourses] = useState([])
   const [filteredCourses, setFilteredCourses] = useState([])
   const [selectedDepartment, setSelectedDepartment] = useState('all')
+  const [selectedGrade, setSelectedGrade] = useState('all')
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState('all')
+  const [selectedSemester, setSelectedSemester] = useState('all')
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -16,19 +19,53 @@ export default function ViewAllCourses({ onEdit }) {
     { value: '健管系', label: '健康事業管理系' }
   ]
 
+  const gradeOptions = [
+    { value: 'all', label: '所有年級' },
+    { value: '1', label: '一年級' },
+    { value: '2', label: '二年級' },
+    { value: '3', label: '三年級' },
+    { value: '4', label: '四年級' }
+  ]
+
+  const academicYearOptions = [
+    { value: 'all', label: '所有學年' },
+    { value: '114', label: '114 學年度' },
+    { value: '113', label: '113 學年度' },
+    { value: '112', label: '112 學年度' }
+  ]
+
+  const semesterOptions = [
+    { value: 'all', label: '所有學期' },
+    { value: '1', label: '上學期' },
+    { value: '2', label: '下學期' }
+  ]
+
   useEffect(() => {
     fetchCourses()
   }, [])
-
-  useEffect(() => {
-    filterCourses()
-  }, [courses, selectedDepartment, searchTerm])
 
   const fetchCourses = async () => {
     setLoading(true)
     try {
       const response = await axios.get(API_ENDPOINTS.courses)
-      setCourses(response.data)
+      const coursesData = response.data.map(course => {
+        // 處理多位教師顯示
+        let teacherDisplay = course.teacher_name || '未設定'
+        
+        // 如果有協同教師資訊，組合顯示
+        if (course.co_teachers && course.co_teachers.length > 0) {
+          // 這裡假設 API 會回傳協同教師的資訊
+          // 如果沒有，我們只顯示主開課教師
+          teacherDisplay = `${course.teacher_name}（主）`
+        }
+        
+        return {
+          ...course,
+          teacher_display: teacherDisplay
+        }
+      })
+      setCourses(coursesData)
+      setFilteredCourses(coursesData)
     } catch (error) {
       console.error('載入課程失敗:', error)
       alert('載入課程失敗，請稍後再試')
@@ -45,16 +82,48 @@ export default function ViewAllCourses({ onEdit }) {
       filtered = filtered.filter(course => course.department === selectedDepartment)
     }
 
+    // 年級篩選
+    if (selectedGrade !== 'all') {
+      filtered = filtered.filter(course => String(course.grade_level) === selectedGrade)
+    }
+
+    // 學年篩選
+    if (selectedAcademicYear !== 'all') {
+      filtered = filtered.filter(course => course.academic_year === selectedAcademicYear)
+    }
+
+    // 學期篩選
+    if (selectedSemester !== 'all') {
+      filtered = filtered.filter(course => course.semester === selectedSemester)
+    }
+
     // 搜尋篩選
     if (searchTerm) {
+      const term = searchTerm.toLowerCase()
       filtered = filtered.filter(course =>
-        course.course_name.includes(searchTerm) ||
-        course.course_code.includes(searchTerm) ||
-        course.teacher_name?.includes(searchTerm)
+        course.course_name?.toLowerCase().includes(term) ||
+        course.course_code?.toLowerCase().includes(term) ||
+        course.teacher_name?.toLowerCase().includes(term) ||
+        course.classroom?.toLowerCase().includes(term)
       )
     }
 
     setFilteredCourses(filtered)
+  }
+
+  // 手動觸發搜尋
+  const handleSearch = () => {
+    filterCourses()
+  }
+
+  // 重置篩選
+  const handleReset = () => {
+    setSelectedDepartment('all')
+    setSelectedGrade('all')
+    setSelectedAcademicYear('all')
+    setSelectedSemester('all')
+    setSearchTerm('')
+    setFilteredCourses(courses)
   }
 
   const handleDelete = async (courseId, courseName) => {
@@ -113,11 +182,48 @@ export default function ViewAllCourses({ onEdit }) {
     <div className="p-6">
       {/* 篩選控制區 */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-        <div className="flex flex-wrap gap-4 items-end">
-          {/* 系所選擇 */}
-          <div className="flex-1 min-w-[200px]">
+        {/* 第一排：學年、學期、系所 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          {/* 學年選擇 */}
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              選擇系所
+              學年
+            </label>
+            <select
+              value={selectedAcademicYear}
+              onChange={(e) => setSelectedAcademicYear(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              {academicYearOptions.map(year => (
+                <option key={year.value} value={year.value}>
+                  {year.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 學期選擇 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              學期
+            </label>
+            <select
+              value={selectedSemester}
+              onChange={(e) => setSelectedSemester(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              {semesterOptions.map(sem => (
+                <option key={sem.value} value={sem.value}>
+                  {sem.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 系所選擇 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              系所
             </label>
             <select
               value={selectedDepartment}
@@ -131,18 +237,40 @@ export default function ViewAllCourses({ onEdit }) {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* 第二排：年級、搜尋框、按鈕、統計 */}
+        <div className="flex flex-wrap gap-4 items-end">
+          {/* 年級選擇 */}
+          <div className="flex-none w-96">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              學生年級
+            </label>
+            <select
+              value={selectedGrade}
+              onChange={(e) => setSelectedGrade(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              {gradeOptions.map(grade => (
+                <option key={grade.value} value={grade.value}>
+                  {grade.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* 搜尋框 */}
-          <div className="flex-1 min-w-[300px]">
+          <div className="flex-1 min-w-[250px]">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              搜尋課程
+              關鍵字
             </label>
             <div className="relative">
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="搜尋課程名稱、代碼或教師姓名..."
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="搜尋..."
                 className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <svg 
@@ -156,12 +284,34 @@ export default function ViewAllCourses({ onEdit }) {
             </div>
           </div>
 
+          {/* 清空按鈕 */}
+          <button
+            onClick={handleReset}
+            className="px-6 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2 font-medium"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            清空
+          </button>
+
+          {/* 查詢按鈕 */}
+          <button
+            onClick={handleSearch}
+            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-medium"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            查詢
+          </button>
+
           {/* 統計資訊 */}
           <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 rounded-lg">
             <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <span className="text-sm font-medium text-blue-700">
+            <span className="text-sm font-semibold text-blue-700">
               共 {filteredCourses.length} 門課程
             </span>
           </div>
@@ -232,8 +382,15 @@ export default function ViewAllCourses({ onEdit }) {
                       {getCourseTypeLabel(course.course_type)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{course.teacher_name || '未設定'}</div>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900">
+                      {course.teacher_display || course.teacher_name || '未設定'}
+                    </div>
+                    {course.co_teachers && course.co_teachers.length > 0 && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        +{course.co_teachers.length} 位協同
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{course.department}</div>

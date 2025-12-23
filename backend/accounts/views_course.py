@@ -97,6 +97,14 @@ def search_courses(request):
                     'role_display': ot.get_role_display()
                 })
             
+            # 檢查是否已收藏
+            is_favorited = False
+            if request.user.is_authenticated:
+                is_favorited = FavoriteCourse.objects.filter(
+                    student=request.user,
+                    offering=offering
+                ).exists()
+            
             courses_data.append({
                 'id': offering.id,
                 'course_code': offering.course.course_code,
@@ -116,6 +124,7 @@ def search_courses(request):
                 'current_students': offering.current_students,
                 'status': offering.status,
                 'status_display': offering.get_status_display(),
+                'is_favorited': is_favorited,
             })
         
         print(f"找到 {len(courses_data)} 門課程")
@@ -234,11 +243,17 @@ def get_enrolled_courses(request):
             print("使用者未登入")
             return Response([], status=200)
         
-        print(f"取得 {request.user.username} 的選課記錄")
+        # 獲取篩選參數
+        academic_year = request.GET.get('academic_year', '114')
+        semester = request.GET.get('semester', '1')
+        
+        print(f"取得 {request.user.username} 的選課記錄 (學年度: {academic_year}, 學期: {semester})")
         
         enrollments = Enrollment.objects.filter(
             student=request.user,
-            status='enrolled'
+            status='enrolled',
+            offering__academic_year=academic_year,
+            offering__semester=semester
         ).select_related(
             'offering__course',
             'offering__department'
@@ -263,7 +278,18 @@ def get_enrolled_courses(request):
                     'classroom': ct.classroom
                 })
             
-            # 取得教師
+            # 取得所有教師
+            teachers = offering.offering_teachers.all()
+            teachers_data = []
+            for ot in teachers:
+                teacher_name = ot.teacher.profile.real_name if hasattr(ot.teacher, 'profile') else ot.teacher.username
+                teachers_data.append({
+                    'id': ot.teacher.id,
+                    'name': teacher_name,
+                    'role': ot.role,
+                })
+            
+            # 取得主教師
             main_teacher = offering.offering_teachers.filter(role='main').first()
             teacher_name = main_teacher.teacher.profile.real_name if main_teacher and hasattr(main_teacher.teacher, 'profile') else '未設定'
             
@@ -275,6 +301,7 @@ def get_enrolled_courses(request):
                 'course_type_display': offering.course.get_course_type_display(),
                 'credits': offering.course.credits,
                 'teacher_name': teacher_name,
+                'teachers': teachers_data,
                 'class_times': times_data,
                 'enrolled_at': enrollment.enrolled_at.strftime('%Y-%m-%d %H:%M:%S'),
             })
@@ -364,7 +391,19 @@ def get_favorite_courses(request):
                     'classroom': ct.classroom
                 })
             
-            # 取得教師
+            # 取得所有教師
+            teachers = offering.offering_teachers.all()
+            teachers_data = []
+            for ot in teachers:
+                teacher_name = ot.teacher.profile.real_name if hasattr(ot.teacher, 'profile') else ot.teacher.username
+                teachers_data.append({
+                    'id': ot.teacher.id,
+                    'name': teacher_name,
+                    'role': ot.role,
+                    'role_display': ot.get_role_display()
+                })
+            
+            # 取得主教師
             main_teacher = offering.offering_teachers.filter(role='main').first()
             teacher_name = main_teacher.teacher.profile.real_name if main_teacher and hasattr(main_teacher.teacher, 'profile') else '未設定'
             
@@ -375,8 +414,20 @@ def get_favorite_courses(request):
                 'course_type': offering.course.course_type,
                 'course_type_display': offering.course.get_course_type_display(),
                 'credits': offering.course.credits,
+                'description': offering.course.description,
+                'academic_year': offering.academic_year,
+                'semester': offering.semester,
+                'semester_display': offering.get_semester_display(),
+                'department': offering.department.name,
+                'grade_level': offering.grade_level,
                 'teacher_name': teacher_name,
+                'teachers': teachers_data,
                 'class_times': times_data,
+                'max_students': offering.max_students,
+                'current_students': offering.current_students,
+                'status': offering.status,
+                'status_display': offering.get_status_display(),
+                'is_favorited': True,  # 收藏列表中的課程當然都是已收藏
                 'favorited_at': favorite.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             })
         
@@ -602,9 +653,9 @@ def update_course(request, course_id):
         teacher_id = request.data.get('teacher_id')
         if teacher_id:
             from .models import OfferingTeacher
-            # 刪除舊的教師關聯
+            # 刪除舊的教師關係
             offering.offering_teachers.all().delete()
-            # 新增新的教師關聯
+            # 新增新的教師關係
             teacher = User.objects.get(id=teacher_id)
             OfferingTeacher.objects.create(
                 offering=offering,

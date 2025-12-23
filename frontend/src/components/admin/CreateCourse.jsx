@@ -15,7 +15,10 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
     semester: '1',
     department: '資管系',
     grade_level: '1',
-    teacher_id: '',
+    teacher_id: '',  // 主開課教師
+    teacher_name: '',      // ← 新增：新教師姓名
+    use_new_teacher: false, // ← 新增：是否使用新教師
+    co_teachers: [],  // 協同教師 ID 陣列
     classroom: '',
     weekday: '1',
     start_period: '1',
@@ -42,7 +45,6 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
       fetchCourseDetail(editingCourseId)
     } else {
       setIsEditMode(false)
-      // 重置表單為新增模式
       resetForm()
     }
   }, [editingCourseId])
@@ -117,6 +119,35 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
     }))
   }
 
+  const handleTeacherModeToggle = () => {
+    setFormData(prev => ({
+      ...prev,
+      use_new_teacher: !prev.use_new_teacher,
+      teacher_id: '',
+      teacher_name: ''
+    }))
+  }
+
+  // 處理協同教師選擇
+  const handleCoTeacherToggle = (teacherId) => {
+    setFormData(prev => {
+      const co_teachers = prev.co_teachers || []
+      if (co_teachers.includes(teacherId)) {
+        // 移除
+        return {
+          ...prev,
+          co_teachers: co_teachers.filter(id => id !== teacherId)
+        }
+      } else {
+        // 新增
+        return {
+          ...prev,
+          co_teachers: [...co_teachers, teacherId]
+        }
+      }
+    })
+  }
+
   const validateForm = () => {
     if (!formData.course_code.trim()) {
       alert('請輸入課程代碼')
@@ -126,8 +157,13 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
       alert('請輸入課程名稱')
       return false
     }
-    if (!formData.teacher_id) {
-      alert('請選擇授課教師')
+    // 修改教師驗證邏輯
+    if (!formData.use_new_teacher && !formData.teacher_id) {
+      alert('請選擇主開課教師')
+      return false
+    }
+    if (formData.use_new_teacher && !formData.teacher_name.trim()) {
+      alert('請輸入新教師姓名')
       return false
     }
     if (!formData.classroom.trim()) {
@@ -136,6 +172,11 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
     }
     if (parseInt(formData.start_period) > parseInt(formData.end_period)) {
       alert('開始節次不能大於結束節次')
+      return false
+    }
+    // 檢查主開課教師不能同時是協同教師（只在使用現有教師時檢查）
+    if (!formData.use_new_teacher && formData.co_teachers && formData.co_teachers.includes(parseInt(formData.teacher_id))) {
+      alert('主開課教師不能同時是協同教師')
       return false
     }
     return true
@@ -157,7 +198,9 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
         start_period: parseInt(formData.start_period),
         end_period: parseInt(formData.end_period),
         max_students: parseInt(formData.max_students),
-        teacher_id: parseInt(formData.teacher_id)
+        teacher_id: formData.use_new_teacher ? null : parseInt(formData.teacher_id),
+        teacher_name: formData.use_new_teacher ? formData.teacher_name.trim() : null,
+        co_teachers: (formData.co_teachers || []).map(id => parseInt(id))
       }
 
       if (isEditMode && editingCourseId) {
@@ -174,7 +217,6 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
       if (onSaveComplete) {
         onSaveComplete()
       } else {
-        // 如果沒有回調，就重置表單
         resetForm()
       }
     } catch (err) {
@@ -202,6 +244,9 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
       department: '資管系',
       grade_level: '1',
       teacher_id: '',
+      teacher_name: '',
+      use_new_teacher: false,
+      co_teachers: [],
       classroom: '',
       weekday: '1',
       start_period: '1',
@@ -231,23 +276,18 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
   const mapCourseType = (courseCategoryName) => {
     const name = String(courseCategoryName).trim()
     
-    // 優先判斷通識類別（因為更具體）
     if (name.includes('通識必修')) {
       return 'general_required'
     }
     if (name.includes('通識選修')) {
       return 'general_elective'
     }
-    
-    // 再判斷專業類別
     if (name.includes('專業必修') || name.includes('必修')) {
       return 'required'
     }
     if (name.includes('專業選修') || name.includes('選修')) {
       return 'elective'
     }
-    
-    // 最後才是一般通識（向後相容）
     if (name.includes('通識')) {
       return 'general_elective'
     }
@@ -269,13 +309,12 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
     return weekdayMap[weekdayText] || '1'
   }
 
-  // 解析節次（例如："6,7" 或 "6-7" 或 "6"）
+  // 解析節次
   const parsePeriods = (periodText) => {
     if (!periodText) return { start: 1, end: 1 }
     
     const text = String(periodText).trim()
     
-    // 處理逗號分隔（例如："6,7"）
     if (text.includes(',')) {
       const periods = text.split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p))
       if (periods.length > 0) {
@@ -283,7 +322,6 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
       }
     }
     
-    // 處理破折號分隔（例如："6-7"）
     if (text.includes('-')) {
       const periods = text.split('-').map(p => parseInt(p.trim())).filter(p => !isNaN(p))
       if (periods.length === 2) {
@@ -291,13 +329,21 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
       }
     }
     
-    // 單一節次
     const period = parseInt(text)
     if (!isNaN(period)) {
       return { start: period, end: period }
     }
     
     return { start: 1, end: 1 }
+  }
+
+  // 解析教師名稱（支援頓號分隔）
+  const parseTeachers = (teacherText) => {
+    if (!teacherText) return []
+    
+    // 使用頓號、逗號或分號分割
+    const names = teacherText.split(/[、,;]/).map(n => n.trim()).filter(n => n)
+    return names
   }
 
   // 處理 XLSX 檔案匯入
@@ -313,38 +359,51 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
       const workbook = XLSX.read(data)
       const worksheet = workbook.Sheets[workbook.SheetNames[0]]
       
-      // 使用 header: 1 來取得陣列格式
-      const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+      const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null })
       
       console.log('原始資料:', rawData)
       console.log('總列數:', rawData.length)
       
-      // 判斷檔案格式：檢查第 5 列（索引 4）是否包含標題
-      let dataStartRow = 1 // 預設從第 2 列開始（最簡單格式）
-      let hasOpeningDeptColumn = false // 是否有「開課系所」欄位
+      // 判斷檔案格式
+      let dataStartRow = 0
+      let hasOpeningDeptColumn = false
       
-      if (rawData.length > 4 && rawData[4]) {
-        const fifthRow = rawData[4]
-        // 如果第 5 列包含「學期」、「科目中文名稱」等標題文字，表示是新格式
-        if (fifthRow.some(cell => 
+      // 找到第一行非空的資料（標題行）
+      let headerRow = null
+      let headerRowIndex = -1
+      
+      for (let i = 0; i < Math.min(10, rawData.length); i++) {
+        const row = rawData[i]
+        if (row && row.some(cell => 
           String(cell).includes('學期') || 
           String(cell).includes('科目中文名稱') || 
           String(cell).includes('授課教師姓名')
         )) {
-          console.log('偵測到標題在第 5 列的格式')
-          dataStartRow = 5 // 資料從第 6 列開始（索引 5）
-          
-          // 檢查是否有「開課系所」欄位
-          if (fifthRow.some(cell => String(cell).includes('開課系所'))) {
-            hasOpeningDeptColumn = true
-            console.log('偵測到有「開課系所」欄位（16 欄格式）')
-          } else if (rawData[4].length > 20) {
-            console.log('偵測到大型檔案格式（31 欄格式）')
-          }
+          headerRow = row
+          headerRowIndex = i
+          console.log(`偵測到標題在第 ${i + 1} 列`)
+          break
         }
       }
       
-      // 跳過標題列
+      if (headerRow) {
+        dataStartRow = headerRowIndex + 1  // 資料從標題的下一行開始
+        
+        // 檢查是否有「開課系所」欄位
+        if (headerRow.some(cell => String(cell).includes('開課系所'))) {
+          hasOpeningDeptColumn = true
+          console.log('偵測到有「開課系所」欄位（16 欄格式）')
+        } else if (headerRow.length > 20) {
+          console.log('偵測到大型檔案格式（31 欄格式）')
+        } else {
+          console.log('偵測到 15 欄格式')
+        }
+      } else {
+        // 沒找到標題，假設第一行就是資料
+        dataStartRow = 0
+        console.log('未偵測到標題行，假設第 1 列開始就是資料')
+      }
+      
       const dataRows = rawData.slice(dataStartRow)
       
       console.log(`資料從第 ${dataStartRow + 1} 列開始，共 ${dataRows.length} 筆`)
@@ -361,30 +420,23 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
       for (let i = 0; i < dataRows.length; i++) {
         const row = dataRows[i]
         
-        // 跳過空白列
         if (!row || row.length === 0 || !row[0]) {
           continue
         }
         
         try {
-          // 判斷是哪種格式
-          let semester, courseCode, courseName, teacherName, maxStudents
+          let semester, courseCode, courseName, teacherText, maxStudents
           let credits, hoursPerWeek, courseCategoryName, classroom
           let weekdayText, periodText, description, gradeLevel, openingDept
           
           if (dataStartRow === 5 && hasOpeningDeptColumn) {
-            // 格式：16 欄，有「開課系所」欄位
-            // 0: 學期, 1: 主開課教師姓名, 2: 開課系所, 3: 核心四碼, 4: 年級
-            // 5: 科目中文名稱, 6: 授課教師姓名, 7: 上課人數, 8: 學分數
-            // 9: 上課週次, 10: 上課時數/週, 11: 課別名稱, 12: 上課地點
-            // 13: 上課星期, 14: 上課節次, 15: 課程中文摘要
-            
+            // 16 欄格式
             semester = String(row[0] || '').trim()
             openingDept = String(row[2] || '').trim()
             courseCode = String(row[3] || '').trim()
             gradeLevel = parseInt(row[4]) || 1
             courseName = String(row[5] || '').trim()
-            teacherName = String(row[6] || '').trim()
+            teacherText = String(row[6] || '').trim()  // 可能包含多位教師
             maxStudents = parseInt(row[7]) || 50
             credits = parseInt(row[8]) || 2
             hoursPerWeek = parseFloat(row[10]) || 2
@@ -394,16 +446,12 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
             periodText = String(row[14] || '').trim()
             description = String(row[15] || '').trim()
           } else if (dataStartRow === 5 && !hasOpeningDeptColumn && row.length > 20) {
-            // 格式：31 欄，沒有「開課系所」欄位（大型檔案）
-            // 1: 學期, 5: 核心四碼, 7: 年級, 9: 科目中文名稱, 11: 授課教師姓名
-            // 12: 上課人數, 15: 學分數, 17: 上課時數/週, 19: 課別名稱
-            // 20: 上課地點, 21: 上課星期, 22: 上課節次, 24: 課程中文摘要
-            
+            // 31 欄格式
             semester = String(row[1] || '').trim()
             courseCode = String(row[5] || '').trim()
             gradeLevel = parseInt(row[7]) || 1
             courseName = String(row[9] || '').trim()
-            teacherName = String(row[11] || '').trim()
+            teacherText = String(row[11] || '').trim()  // 可能包含多位教師
             maxStudents = parseInt(row[12]) || 50
             credits = parseInt(row[15]) || 2
             hoursPerWeek = parseFloat(row[17]) || 2
@@ -413,16 +461,12 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
             periodText = String(row[22] || '').trim()
             description = String(row[24] || '').trim()
           } else {
-            // 格式：15 欄，最簡單格式（沒有開課系所）
-            // 0: 學期, 2: 核心四碼, 3: 年級, 4: 科目中文名稱, 5: 授課教師姓名
-            // 6: 上課人數, 7: 學分數, 9: 上課時數/週, 10: 課別名稱
-            // 11: 上課地點, 12: 上課星期, 13: 上課節次, 14: 課程中文摘要
-            
+            // 15 欄格式
             semester = String(row[0] || '').trim()
             courseCode = String(row[2] || '').trim()
             gradeLevel = parseInt(row[3]) || 1
             courseName = String(row[4] || '').trim()
-            teacherName = String(row[5] || '').trim()
+            teacherText = String(row[5] || '').trim()  // 可能包含多位教師
             maxStudents = parseInt(row[6]) || 50
             credits = parseInt(row[7]) || 2
             hoursPerWeek = parseFloat(row[9]) || 2
@@ -433,8 +477,8 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
             description = String(row[14] || '').trim()
           }
           
-          const academicYear = semester.substring(0, 3) // 例如 "1141" -> "114"
-          const semesterNum = semester.substring(3, 4) // 例如 "1141" -> "1"
+          const academicYear = semester.substring(0, 3)
+          const semesterNum = semester.substring(3, 4)
 
           // 資料驗證
           if (!courseCode) {
@@ -449,31 +493,90 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
             continue
           }
           
-          if (!teacherName) {
+          if (!teacherText) {
             results.errors.push(`第 ${i + 2} 列：缺少教師姓名`)
             results.failed++
             continue
           }
 
-          console.log(`處理第 ${i + 2} 列，教師姓名: "${teacherName}"`)
+          // 解析教師名稱（支援多位教師，用頓號分隔）
+          const teacherNames = parseTeachers(teacherText)
+          console.log(`處理第 ${i + 2} 列，教師: ${teacherNames.join('、')}`)
 
-          // 找到對應的教師
-          const teacher = teachers.find(t => t.real_name === teacherName)
-          if (!teacher) {
-            results.errors.push(`第 ${i + 2} 列：找不到教師「${teacherName}」，請先建立該教師帳號`)
+          if (teacherNames.length === 0) {
+            results.errors.push(`第 ${i + 2} 列：無法解析教師姓名`)
             results.failed++
             continue
           }
+
+          // 找到所有教師（如果不存在則創建）
+          const foundTeachers = []
+          const createdTeachers = [] // 記錄新創建的教師
+          
+          for (const name of teacherNames) {
+            let teacher = teachers.find(t => t.real_name === name)
+            if (teacher) {
+              foundTeachers.push(teacher)
+            } else {
+              // 教師不存在，自動創建
+              console.log(`自動創建教師: ${name}`)
+              try {
+                // 生成臨時教師物件（實際創建會在後端完成）
+                const newTeacher = {
+                  id: `new_${name}`, // 臨時 ID
+                  real_name: name,
+                  username: `teacher_${name}`,
+                  is_new: true // 標記為新教師
+                }
+                foundTeachers.push(newTeacher)
+                createdTeachers.push(name)
+                
+                // 也加入 teachers 列表，避免同一個 Excel 中重複創建
+                teachers.push(newTeacher)
+              } catch (err) {
+                results.errors.push(`第 ${i + 2} 列：無法創建教師「${name}」: ${err.message}`)
+                results.failed++
+                continue
+              }
+            }
+          }
+
+          if (createdTeachers.length > 0) {
+            console.log(`第 ${i + 2} 列：自動創建教師 ${createdTeachers.join('、')}`)
+          }
+
+          if (foundTeachers.length === 0) {
+            results.errors.push(`第 ${i + 2} 列：找不到任何有效教師`)
+            results.failed++
+            continue
+          }
+
+          // 第一位教師為主開課，其餘為協同
+          const mainTeacher = foundTeachers[0]
+          
+          // 分離協同教師：現有的和新建的
+          const coTeacherIds = []
+          const coTeacherNames = []
+          
+          for (const teacher of foundTeachers.slice(1)) {
+            if (teacher.is_new) {
+              coTeacherNames.push(teacher.real_name)
+            } else {
+              coTeacherIds.push(teacher.id)
+            }
+          }
+
+          console.log(`主開課: ${mainTeacher.real_name}${mainTeacher.is_new ? '(新建)' : ''}, 協同: ${coTeacherIds.length + coTeacherNames.length} 位`)
+
 
           // 解析星期和節次
           const weekday = mapWeekday(weekdayText)
           const periods = parsePeriods(periodText)
 
-          // 決定課程系所：優先使用 Excel 中的系所，否則使用選擇的系所
-          let department = importDepartment // 預設使用選擇的系所
+          // 決定課程系所
+          let department = importDepartment
           
           if (openingDept) {
-            // 如果 Excel 有「開課系所」欄位，使用該值
             department = openingDept
             console.log(`使用 Excel 中的系所: ${department}`)
           } else {
@@ -492,7 +595,12 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
             semester: semesterNum,
             department: department,
             grade_level: gradeLevel,
-            teacher_id: teacher.id,
+            // 主教師
+            teacher_id: mainTeacher.is_new ? null : mainTeacher.id,
+            teacher_name: mainTeacher.is_new ? mainTeacher.real_name : null,
+            // 協同教師：分別傳 ID 和姓名
+            co_teachers: coTeacherIds,
+            co_teacher_names: coTeacherNames,
             classroom: classroom,
             weekday: weekday,
             start_period: periods.start,
@@ -500,7 +608,7 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
             max_students: maxStudents
           }
 
-          console.log(`準備建立課程: ${courseName}`)
+          console.log(`準備建立課程: ${courseName}${mainTeacher.is_new ? ' (將創建新教師: ' + mainTeacher.real_name + ')' : ''}`)
 
           // 送出到後端
           await axios.post(API_ENDPOINTS.coursesCreate, courseData)
@@ -511,7 +619,7 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
           console.error(`第 ${i + 2} 列錯誤:`, error)
           results.failed++
           const errorMsg = error.response?.data?.error || error.message
-          results.errors.push(`第 ${i + 2} 列（${row[4] || '未知課程'}）：${errorMsg}`)
+          results.errors.push(`第 ${i + 2} 列（${row[4] || row[5] || '未知課程'}）：${errorMsg}`)
         }
       }
 
@@ -523,7 +631,6 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
         alert(`匯入失敗：所有 ${results.failed} 筆資料都未能成功匯入\n\n請查看下方錯誤訊息`)
       }
 
-      // 重新整理教師列表（以防有新增）
       if (results.success > 0) {
         fetchTeachers()
       }
@@ -533,8 +640,21 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
       alert('檔案處理失敗，請確認檔案格式是否正確\n\n錯誤訊息：' + error.message)
     } finally {
       setImportLoading(false)
-      e.target.value = '' // 清空 input，允許重複選擇同一檔案
+      e.target.value = ''
     }
+  }
+
+  // 取得協同教師的名稱列表
+  const getCoTeacherNames = () => {
+    if (!formData.co_teachers || formData.co_teachers.length === 0) {
+      return '無'
+    }
+    return formData.co_teachers
+      .map(id => {
+        const teacher = teachers.find(t => t.id === parseInt(id))
+        return teacher ? teacher.real_name : `未知(${id})`
+      })
+      .join('、')
   }
 
   return (
@@ -550,109 +670,90 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
             </span>
           )}
         </div>
-        
-        {/* Excel 匯入區塊 - 僅在新增模式顯示 */}
-        {!isEditMode && (
-          <div className="mb-8 bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-lg border-2 border-indigo-200">
-            <h3 className="text-lg font-bold text-gray-700 mb-3 flex items-center">
-              <svg className="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
+        {/* Excel 匯入區域 */}
+        <div className="mb-8 p-6 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border-2 border-dashed border-green-300">
+          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+            <svg className="w-6 h-6 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            批次匯入課程（Excel）
+          </h3>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              選擇預設開課系所（當 Excel 無系所欄位時使用）
+            </label>
+            <select
+              value={importDepartment}
+              onChange={(e) => setImportDepartment(e.target.value)}
+              className="w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            >
+              {departmentOptions.map(dept => (
+                <option key={dept.value} value={dept.value}>
+                  {dept.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* <div className="mb-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+            <h4 className="font-bold text-yellow-800 mb-2">📝 教師欄位格式說明：</h4>
+            <ul className="text-sm text-yellow-700 space-y-1">
+              <li>• 單一教師：直接填寫教師姓名（例如：老師一）</li>
+              <li>• 多位教師：使用<strong>頓號「、」</strong>分隔（例如：老師一、老師二）</li>
+              <li>• <strong className="text-red-600">第一位教師</strong>為<strong className="text-blue-600">主開課</strong>，其餘為<strong className="text-purple-600">協同</strong></li>
+              <li>• 範例：「張三、李四、王五」→ 張三為主開課，李四和王五為協同教師</li>
+            </ul>
+          </div> */}
+
+          <div>
+            <label className="cursor-pointer inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              批次匯入課程（XLSX）
-            </h3>
-            
-            <div className="mb-4 text-sm text-gray-600 bg-white p-3 rounded border border-gray-200">
-              <p className="font-semibold mb-2">📋 檔案格式說明：</p>
-              <p className="mb-1">欄位順序：學期、主開課教師姓名、核心四碼、年級、科目中文名稱、授課教師姓名、上課人數、學分數、上課週次、上課時數/週、課別名稱、上課地點、上課星期、上課節次、課程中文摘要</p>
-              <p className="text-xs text-gray-500 mt-2">範例：1141, 蘇美禎, 1041, 1, 性別與健康照護, 蘇美禎, 49, 2, 全18週, 2.00, 專業選修(系所), F412, 5, 6,7, 本課程以性別...</p>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                預設系所（當 Excel 沒有系所欄位時使用）
-              </label>
-              <select
-                value={importDepartment}
-                onChange={(e) => setImportDepartment(e.target.value)}
-                className="w-full px-4 py-2.5 border-2 border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+              {importLoading ? '匯入中...' : '選擇 Excel 檔案'}
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileImport}
                 disabled={importLoading}
-              >
-                {departmentOptions.map(dept => (
-                  <option key={dept.value} value={dept.value}>
-                    {dept.label}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                💡 如果 Excel 有「開課系所」欄位，會優先使用 Excel 中的系所
-              </p>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <label className="flex-1">
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleFileImport}
-                  disabled={importLoading}
-                  className="hidden"
-                  id="xlsx-upload"
-                />
-                <div className="flex items-center justify-center px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium cursor-pointer hover:bg-indigo-700 transition-colors disabled:bg-gray-400">
-                  {importLoading ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      匯入中...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                      選擇 XLSX 檔案匯入
-                    </>
-                  )}
-                </div>
-              </label>
-            </div>
-
-            {importResults && (
-              <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
-                <h4 className="font-bold text-gray-700 mb-2">匯入結果：</h4>
-                <div className="space-y-1 text-sm">
-                  <p>總筆數：<span className="font-semibold">{importResults.total}</span></p>
-                  <p className="text-green-600">成功：<span className="font-semibold">{importResults.success}</span> 筆</p>
-                  <p className="text-red-600">失敗：<span className="font-semibold">{importResults.failed}</span> 筆</p>
-                </div>
-                
-                {importResults.errors.length > 0 && (
-                  <div className="mt-3 max-h-40 overflow-y-auto">
-                    <p className="font-semibold text-red-600 mb-1">錯誤訊息：</p>
-                    <ul className="text-xs text-red-500 space-y-1">
-                      {importResults.errors.map((error, idx) => (
-                        <li key={idx}>• {error}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
+                className="hidden"
+              />
+            </label>
+            <p className="mt-2 text-sm text-gray-600">
+              支援 .xlsx 和 .xls 格式
+            </p>
           </div>
-        )}
 
-        <div className="mb-6 border-t-2 border-gray-200 pt-6">
-          <h3 className="text-lg font-bold text-gray-700 mb-4">
-            {isEditMode ? '修改課程資料' : '或手動新增單一課程'}
-          </h3>
+          {importResults && (
+            <div className="mt-6">
+              <div className={`p-4 rounded-lg ${importResults.failed === 0 ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300'} border-2`}>
+                <h4 className="font-bold mb-2">匯入結果：</h4>
+                <p>總共：{importResults.total} 筆</p>
+                <p className="text-green-700">成功：{importResults.success} 筆</p>
+                <p className="text-red-700">失敗：{importResults.failed} 筆</p>
+              </div>
+              
+              {importResults.errors.length > 0 && (
+                <div className="mt-4 p-4 bg-red-50 border-2 border-red-200 rounded-lg">
+                  <h4 className="font-bold text-red-800 mb-2">錯誤訊息：</h4>
+                  <ul className="list-disc list-inside text-sm text-red-700 space-y-1 max-h-60 overflow-y-auto">
+                    {importResults.errors.map((error, index) => (
+                      <li key={index}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
+        {/* 手動新增表單 */}
         <form onSubmit={handleSubmit}>
-          {/* 基本資料 */}
-          <div className="space-y-4 mb-6">
-            <h3 className="text-lg font-bold text-gray-700 border-b pb-2">基本資料</h3>
+          {/* 課程基本資訊 */}
+          <div className="space-y-4 mb-6 bg-blue-50 p-4 rounded-lg">
+            <h3 className="text-lg font-bold text-gray-700 border-b pb-2">課程基本資訊</h3>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -679,7 +780,7 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
                   value={formData.course_name}
                   onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="請輸入課程名稱"
+                  placeholder="例如：計算機概論"
                 />
               </div>
             </div>
@@ -692,9 +793,9 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                rows="3"
+                rows={3}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="請輸入課程描述（選填）"
+                placeholder="請輸入課程描述..."
               />
             </div>
 
@@ -825,23 +926,114 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
               </div>
             </div>
 
+            {/* 主開課教師 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                授課教師 <span className="text-red-500">*</span>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  主開課教師 <span className="text-red-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleTeacherModeToggle}
+                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium transition-colors"
+                >
+                  {formData.use_new_teacher ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      使用現有教師
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                      </svg>
+                      新增教師
+                    </>
+                  )}
+                </button>
+              </div>
+              
+              {formData.use_new_teacher ? (
+                // 輸入新教師姓名
+                <div>
+                  <input
+                    type="text"
+                    name="teacher_name"
+                    value={formData.teacher_name}
+                    onChange={handleChange}
+                    placeholder="輸入教師姓名（例如：王小明）"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                  />
+                  <div className="mt-2 text-xs text-gray-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div>
+                        <p className="font-medium text-blue-800">系統將自動創建教師帳號</p>
+                        <p className="mt-1 text-blue-700">帳號格式：teacher_姓名_隨機編號</p>
+                        <p className="mt-1 text-blue-700">密碼將隨機生成並顯示在後台日誌</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // 選擇現有教師
+                <select
+                  name="teacher_id"
+                  value={formData.teacher_id}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                >
+                  <option value="">請選擇主開課教師</option>
+                  {teachers.map(teacher => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.real_name} ({teacher.username})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* 協同教師 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                協同教師（選填，可複選）
               </label>
-              <select
-                name="teacher_id"
-                value={formData.teacher_id}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-              >
-                <option value="">請選擇教師</option>
-                {teachers.map(teacher => (
-                  <option key={teacher.id} value={teacher.id}>
-                    {teacher.real_name} ({teacher.username})
-                  </option>
-                ))}
-              </select>
+              <div className="border border-gray-300 rounded-lg p-4 max-h-60 overflow-y-auto bg-white">
+                {teachers.length === 0 ? (
+                  <p className="text-gray-500 text-sm">沒有可用的教師</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {teachers
+                      .filter(t => String(t.id) !== String(formData.teacher_id)) // 排除主開課教師
+                      .map(teacher => (
+                        <label
+                          key={teacher.id}
+                          className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={(formData.co_teachers || []).includes(teacher.id)}
+                            onChange={() => handleCoTeacherToggle(teacher.id)}
+                            className="mr-2 w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">
+                            {teacher.real_name} ({teacher.username})
+                          </span>
+                        </label>
+                      ))
+                    }
+                  </div>
+                )}
+              </div>
+              {formData.co_teachers && formData.co_teachers.length > 0 && (
+                <p className="mt-2 text-sm text-gray-600">
+                  已選擇 {formData.co_teachers.length} 位協同教師：{getCoTeacherNames()}
+                </p>
+              )}
             </div>
           </div>
 

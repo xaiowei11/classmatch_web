@@ -10,8 +10,6 @@ export default function MyCourses() {
     semester: '1'
   })
 
-  //const API_BASE_URL = 'http://localhost:8000/api'
-
   // 定義節次時間
   const periods = [
     { period: 1, time: '08:10-09:00' },
@@ -134,35 +132,200 @@ export default function MyCourses() {
     return course.end_period - course.start_period + 1
   }
 
+  // 下載課表功能
+  const downloadSchedule = () => {
+    // 創建一個隱藏的 canvas 來繪製課表
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    
+    // 設定 canvas 尺寸
+    const cellWidth = 150
+    const cellHeight = 80
+    const headerHeight = 50  // 減少標題高度（原本 60）
+    const timeColWidth = 120
+    const padding = 6  // 課程方塊的內邊距
+    
+    canvas.width = timeColWidth + cellWidth * weekdays.length
+    canvas.height = headerHeight + cellHeight * periods.length
+    
+    // 設定字體
+    ctx.font = '14px Arial'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    
+    // 繪製白色背景
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    
+    // ❌ 移除「我的課表」標題繪製
+    // ctx.fillStyle = '#1f2937'
+    // ctx.font = 'bold 18px Arial'
+    // ctx.fillText('我的課表', canvas.width / 2, 30)
+    
+    // 繪製表頭背景
+    ctx.fillStyle = '#f3f4f6'
+    ctx.fillRect(0, headerHeight, timeColWidth, cellHeight * periods.length)
+    
+    // 繪製星期標題
+    ctx.fillStyle = '#3b82f6'
+    ctx.font = 'bold 16px Arial'
+    weekdays.forEach((day, index) => {
+      const x = timeColWidth + cellWidth * index + cellWidth / 2
+      ctx.fillText(day.label, x, headerHeight / 2)
+    })
+    
+    // 繪製時間標題
+    ctx.fillStyle = '#374151'
+    ctx.font = '12px Arial'
+    ctx.fillText('時間', timeColWidth / 2, headerHeight / 2)
+    
+    // 繪製格線和內容
+    periods.forEach((periodInfo, pIndex) => {
+      const y = headerHeight + cellHeight * pIndex
+      
+      // 繪製時間列
+      ctx.fillStyle = '#6b7280'
+      ctx.font = 'bold 13px Arial'
+      ctx.fillText(`第${periodInfo.period}節`, timeColWidth / 2, y + 25)
+      ctx.font = '11px Arial'
+      ctx.fillText(periodInfo.time, timeColWidth / 2, y + 45)
+      
+      // 繪製每個星期的格子
+      weekdays.forEach((day, wIndex) => {
+        const x = timeColWidth + cellWidth * wIndex
+        
+        // 檢查是否應該合併（跳過）
+        if (shouldMerge(day.value, periodInfo.period)) {
+          return
+        }
+        
+        const coursesHere = getCourseAt(day.value, periodInfo.period)
+        
+        // 繪製邊框
+        ctx.strokeStyle = '#d1d5db'
+        ctx.strokeRect(x, y, cellWidth, cellHeight)
+        
+        if (coursesHere.length > 0) {
+          const course = coursesHere[0]
+          const rowSpan = getRowSpan(course)
+          const totalHeight = cellHeight * rowSpan
+          
+          // ✅ 繪製課程背景（加入留白）
+          ctx.fillStyle = '#dbeafe'
+          ctx.fillRect(
+            x + padding, 
+            y + padding, 
+            cellWidth - padding * 2, 
+            totalHeight - padding * 2
+          )
+          
+          // 繪製圓角效果（用邊框模擬）
+          ctx.strokeStyle = '#93c5fd'
+          ctx.lineWidth = 2
+          ctx.strokeRect(
+            x + padding, 
+            y + padding, 
+            cellWidth - padding * 2, 
+            totalHeight - padding * 2
+          )
+          ctx.lineWidth = 1
+          
+          // 繪製課程名稱
+          ctx.fillStyle = '#1e40af'
+          ctx.font = 'bold 13px Arial'
+          
+          // 課程名稱可能很長，需要換行
+          const courseName = course.course_name
+          const maxWidth = cellWidth - padding * 2 - 10
+          const words = courseName.split('')
+          let line = ''
+          let lines = []
+          
+          for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n]
+            const metrics = ctx.measureText(testLine)
+            if (metrics.width > maxWidth && n > 0) {
+              lines.push(line)
+              line = words[n]
+            } else {
+              line = testLine
+            }
+          }
+          lines.push(line)
+          
+          // 只顯示前兩行
+          const displayLines = lines.slice(0, 2)
+          const lineHeight = 18
+          const textStartY = y + padding + (totalHeight - padding * 2 - displayLines.length * lineHeight - 15) / 2
+          
+          displayLines.forEach((textLine, i) => {
+            ctx.fillText(textLine, x + cellWidth / 2, textStartY + i * lineHeight + lineHeight / 2)
+          })
+          
+          // 繪製教室
+          ctx.fillStyle = '#4b5563'
+          ctx.font = '11px Arial'
+          ctx.fillText(course.classroom, x + cellWidth / 2, y + totalHeight - padding - 10)
+        }
+      })
+    })
+    
+    // 將 canvas 轉換為圖片並下載
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `課表_${filters.academic_year}學年度第${filters.semester}學期.png`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    })
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">我的課表</h2>
         
-        {/* 學年度和學期選擇 */}
-        <div className="flex gap-4">
-          <div>
-            <label className="text-sm font-medium text-gray-700 mr-2">學年度</label>
-            <select
-              value={filters.academic_year}
-              onChange={(e) => setFilters(prev => ({ ...prev, academic_year: e.target.value }))}
-              className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="113">113</option>
-              <option value="114">114</option>
-            </select>
+        <div className="flex gap-4 items-center">
+          {/* 學年度和學期選擇 */}
+          <div className="flex gap-3">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mr-2">學年度</label>
+              <select
+                value={filters.academic_year}
+                onChange={(e) => setFilters(prev => ({ ...prev, academic_year: e.target.value }))}
+                className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="113">113</option>
+                <option value="114">114</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mr-2">學期</label>
+              <select
+                value={filters.semester}
+                onChange={(e) => setFilters(prev => ({ ...prev, semester: e.target.value }))}
+                className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="1">上學期</option>
+                <option value="2">下學期</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 mr-2">學期</label>
-            <select
-              value={filters.semester}
-              onChange={(e) => setFilters(prev => ({ ...prev, semester: e.target.value }))}
-              className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="1">上學期</option>
-              <option value="2">下學期</option>
-            </select>
-          </div>
+          
+          {/* 下載按鈕 */}
+          <button
+            onClick={downloadSchedule}
+            disabled={courses.length === 0}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            下載課表
+          </button>
         </div>
       </div>
 
@@ -207,17 +370,14 @@ export default function MyCourses() {
                       return (
                         <td 
                           key={day.value} 
-                          className="border border-gray-300 p-2 align-middle w-40"
+                          className="border border-gray-300 p-3 align-middle w-40"
                           rowSpan={rowSpan}
                         >
-                          <div className="bg-blue-100 rounded p-3 flex flex-col items-center justify-center gap-1" 
-                               style={{ height: `${rowSpan * 80 - 16}px` }}>
+                          <div className="bg-blue-100 rounded p-2 flex flex-col items-center justify-center gap-1" 
+                               style={{ height: `${rowSpan * 80 - 24}px`, margin: '4px' }}>
                             <div className="font-semibold text-sm text-gray-800 text-center line-clamp-2 overflow-hidden">
                               {course.course_name}
                             </div>
-                            {/* <div className="text-xs text-gray-600 text-center">
-                              {course.teacher_name}
-                            </div> */}
                             <div className="text-xs text-gray-600 text-center">
                               {course.classroom}
                             </div>
@@ -242,6 +402,9 @@ export default function MyCourses() {
       {!loading && courses.length === 0 && (
         <div className="text-center py-8">
           <p className="text-gray-500">目前沒有已選課程</p>
+          <p className="text-sm text-gray-400 mt-2">
+            請在「選課」頁面中選擇課程
+          </p>
         </div>
       )}
     </div>
