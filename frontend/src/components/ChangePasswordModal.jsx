@@ -4,12 +4,12 @@ import { API_ENDPOINTS } from '../config/api'
 import { useToast } from '../contexts/ToastContext'
 import { useLanguage } from '../contexts/LanguageContext'
 
-// 獲取 CSRF token（優先從 localStorage，適用生產環境）
+// 獲取 CSRF token
 function getCSRFToken() {
-    // 優先從 localStorage 獲取（登入時後端回傳並儲存的）
-    const token = localStorage.getItem('csrfToken');
+    // 優先從 localStorage 獲取（注意：key 是小寫 csrftoken）
+    const token = localStorage.getItem('csrftoken');  // ← 改成小寫
     if (token) {
-        console.log('使用 localStorage 中的 CSRF token');
+        console.log('✅ 使用 localStorage 中的 CSRF token');
         return token;
     }
     
@@ -21,14 +21,14 @@ function getCSRFToken() {
             const cookie = cookies[i].trim();
             if (cookie.substring(0, 10) === 'csrftoken=') {
                 cookieValue = decodeURIComponent(cookie.substring(10));
-                console.log('使用 cookie 中的 CSRF token');
+                console.log('✅ 使用 cookie 中的 CSRF token');
                 break;
             }
         }
     }
     
     if (!cookieValue) {
-        console.warn('無法獲取 CSRF token');
+        console.warn('⚠️ 無法獲取 CSRF token');
     }
     
     return cookieValue;
@@ -79,7 +79,7 @@ export default function ChangePasswordModal({ isOpen, onClose, isMandatory = fal
             })
 
             toast.success('密碼修改成功！')
-            onClose() // 這裡的 onClose 在 mandatory 模式下通常會導向首頁
+            onClose()
             setOldPassword('')
             setNewPassword('')
             setConfirmPassword('')
@@ -87,7 +87,7 @@ export default function ChangePasswordModal({ isOpen, onClose, isMandatory = fal
         } catch (error) {
             console.error('修改密碼失敗:', error)
             console.error('錯誤詳情:', error.response?.data)
-            toast.error(error.response?.data?.error || '修改密碼失敗')
+            toast.error(error.response?.data?.error || error.response?.data?.detail || '修改密碼失敗')
         } finally {
             setLoading(false)
         }
