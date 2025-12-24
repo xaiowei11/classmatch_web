@@ -2,27 +2,12 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import schoolLogo from '../images/maxresdefault.jpg'
-import { API_ENDPOINTS, setStoredCsrfToken } from '../config/api'
+import { API_ENDPOINTS } from '../config/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useToast } from '../contexts/ToastContext'
 import LanguageSwitch from '../components/LanguageSwitch'
 import ThemeSwitch from '../components/ThemeSwitch'
 import ChangePasswordModal from '../components/ChangePasswordModal'
-
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-}
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -35,19 +20,10 @@ export default function LoginPage() {
   const { t } = useLanguage()
   const { toast } = useToast()
 
-  useEffect(() => {
-    fetchCSRFToken()
-  }, [])
-
-  const fetchCSRFToken = async () => {
-    try {
-      await axios.get(API_ENDPOINTS.filterOptions, {
-        withCredentials: true
-      })
-    } catch (error) {
-      console.error('獲取 CSRF token 失敗:', error)
-    }
-  }
+  // ❌ 移除 fetchCSRFToken，登入不需要預先獲取 token
+  // useEffect(() => {
+  //   fetchCSRFToken()
+  // }, [])
 
   const handleLogin = async () => {
     if (!username || !password) {
@@ -57,46 +33,58 @@ export default function LoginPage() {
 
     setIsLoading(true)
     try {
-      const csrfToken = getCookie('csrftoken')
-
+      console.log('開始登入流程...')
+      
+      // ✅ 登入請求不需要 CSRF token（後端已設置 @csrf_exempt）
       const res = await axios.post(API_ENDPOINTS.login, {
-        username, password
+        username, 
+        password
       }, {
-        withCredentials: true,
-        headers: csrfToken ? {
-          'X-CSRFToken': csrfToken
-        } : {}
+        withCredentials: true
+        // ❌ 不需要 headers: { 'X-CSRFToken': ... }
       })
 
+      console.log('登入成功，回應數據:', res.data)
+
+      // 儲存用戶資訊
       localStorage.setItem('username', username)
       if (res.data.real_name) {
         localStorage.setItem('realName', res.data.real_name)
       }
 
-      // 儲存 CSRF Token
+      // ✅ 儲存後端回傳的 CSRF Token（使用小寫 csrftoken）
       if (res.data.csrfToken) {
-        setStoredCsrfToken(res.data.csrfToken)
+        localStorage.setItem('csrftoken', res.data.csrfToken)
+        console.log('✅ CSRF token 已儲存到 localStorage')
+      } else {
+        console.warn('⚠️ 後端沒有回傳 csrfToken')
       }
 
       toast.success(t('common.success'))
 
-
-
+      // 檢查是否需要強制修改密碼
       const shouldForce = res.data.force_password_change
       if (shouldForce) {
+        console.log('需要強制修改密碼')
         setShowForceModal(true)
       }
 
+      // 根據角色導向
       if (res.data.role) {
         const path = `/${res.data.role}home`
-        if (!shouldForce) navigate(path)
-        else setPendingNavigatePath(path)
+        if (!shouldForce) {
+          navigate(path)
+        } else {
+          setPendingNavigatePath(path)
+        }
       } else if (res.data.roles && res.data.roles.length > 0) {
-        // 如果只有一個角色但後端沒傳 role 欄位，直接跳轉
         if (res.data.roles.length === 1) {
           const path = `/${res.data.roles[0]}home`
-          if (!shouldForce) navigate(path)
-          else setPendingNavigatePath(path)
+          if (!shouldForce) {
+            navigate(path)
+          } else {
+            setPendingNavigatePath(path)
+          }
         } else {
           setRoles(res.data.roles)
         }
@@ -106,7 +94,8 @@ export default function LoginPage() {
       }
     } catch (err) {
       console.error('登入錯誤:', err)
-      toast.error(t('login.loginError') + ': ' + (err.response?.data?.error || err.message))
+      console.error('錯誤詳情:', err.response?.data)
+      toast.error(t('login.loginError') + ': ' + (err.response?.data?.error || err.response?.data?.detail || err.message))
     } finally {
       setIsLoading(false)
     }
