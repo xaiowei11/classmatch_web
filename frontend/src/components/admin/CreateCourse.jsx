@@ -465,18 +465,19 @@ export default function CreateCourse({ editingCourseId, onSaveComplete }) {
           } else {
             // 15 欄格式
             semester = String(row[0] || '').trim()
-            courseCode = String(row[2] || '').trim()
-            gradeLevel = parseInt(row[3]) || 1
-            courseName = String(row[4] || '').trim()
-            teacherText = String(row[5] || '').trim()  // 可能包含多位教師
-            maxStudents = parseInt(row[6]) || 50
-            credits = parseInt(row[7]) || 2
-            hoursPerWeek = parseFloat(row[9]) || 2
-            courseCategoryName = String(row[10] || '').trim()
-            classroom = String(row[11] || '').trim()
-            weekdayText = String(row[12] || '').trim()
-            periodText = String(row[13] || '').trim()
-            description = String(row[14] || '').trim()
+            openingDept = String(row[2] || '').trim()
+            courseCode = String(row[3] || '').trim()
+            gradeLevel = parseInt(row[4]) || 1
+            courseName = String(row[5] || '').trim()
+            teacherText = String(row[6] || '').trim()  // 可能包含多位教師
+            maxStudents = parseInt(row[7]) || 50
+            credits = parseInt(row[8]) || 2
+            hoursPerWeek = parseFloat(row[10]) || 2
+            courseCategoryName = String(row[11] || '').trim()
+            classroom = String(row[12] || '').trim()
+            weekdayText = String(row[13] || '').trim()
+            periodText = String(row[14] || '').trim()
+            description = String(row[15] || '').trim()
           }
 
           const academicYear = semester.substring(0, 3)
