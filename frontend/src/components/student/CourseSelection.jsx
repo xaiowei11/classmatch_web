@@ -601,9 +601,26 @@ export default function CourseSelection() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {courses.map(course => {
                       // 取得教師名稱
-                      const teacherNames = course.teachers && course.teachers.length > 0
-                        ? course.teachers.map(t => t.name).join('、')
-                        : '未設定'
+                      const getTeacherDisplay = () => {
+                        if (!course.teachers || course.teachers.length === 0) {
+                          return '未設定'
+                        }
+                        
+                        // 找出主要教師（is_primary_teacher 為 true）
+                        const primaryTeacher = course.teachers.find(t => t.is_primary_teacher)
+                        const coTeachers = course.teachers.filter(t => !t.is_primary_teacher)
+                        
+                        if (primaryTeacher && coTeachers.length > 0) {
+                          return `${primaryTeacher.name} +${coTeachers.length}位協同`
+                        } else if (primaryTeacher) {
+                          return primaryTeacher.name
+                        } else {
+                          // 如果沒有標記主要教師，顯示第一位
+                          return course.teachers[0].name + (course.teachers.length > 1 ? ` +${course.teachers.length - 1}位協同` : '')
+                        }
+                      }
+
+                      const teacherNames = getTeacherDisplay()
                       
                       // 改成分別計算星期和節次
                       const weekdayDisplay = course.class_times && course.class_times.length > 0

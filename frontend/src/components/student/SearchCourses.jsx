@@ -401,9 +401,24 @@ export default function SearchCourses() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {courses.map(course => {
-                  const teacherNames = course.teachers && course.teachers.length > 0
-                    ? course.teachers.map(t => t.name).join('、')
-                    : '未設定'
+                  const getTeacherDisplay = () => {
+                    if (!course.teachers || course.teachers.length === 0) {
+                      return '未設定'
+                    }
+                    
+                    const primaryTeacher = course.teachers.find(t => t.is_primary_teacher)
+                    const coTeachers = course.teachers.filter(t => !t.is_primary_teacher)
+                    
+                    if (primaryTeacher && coTeachers.length > 0) {
+                      return `${primaryTeacher.name} +${coTeachers.length}位協同`
+                    } else if (primaryTeacher) {
+                      return primaryTeacher.name
+                    } else {
+                      return course.teachers[0].name + (course.teachers.length > 1 ? ` +${course.teachers.length - 1}位協同` : '')
+                    }
+                  }
+
+                  const teacherNames = getTeacherDisplay()
                   
                   const weekdayDisplay = course.class_times && course.class_times.length > 0
                     ? course.class_times.map(t => t.weekday_display).join('、')
