@@ -160,6 +160,7 @@ def login_view(request):
         return Response({'error': f"系統錯誤: {str(e)}"}, status=500)
 
 
+@csrf_exempt
 @api_view(['POST'])
 def logout_view(request):
     """使用者登出"""
