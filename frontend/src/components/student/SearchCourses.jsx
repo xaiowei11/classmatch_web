@@ -392,7 +392,8 @@ export default function SearchCourses() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">類別</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">學分</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">教師</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">時間</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">星期</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">節次</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">教室</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">人數</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">收藏</th>
@@ -404,8 +405,12 @@ export default function SearchCourses() {
                     ? course.teachers.map(t => t.name).join('、')
                     : '未設定'
                   
-                  const timeDisplay = course.class_times && course.class_times.length > 0
-                    ? course.class_times.map(t => `${t.weekday_display} ${t.start_period}-${t.end_period}節`).join('；')
+                  const weekdayDisplay = course.class_times && course.class_times.length > 0
+                    ? course.class_times.map(t => t.weekday_display).join('、')
+                    : '未設定'
+
+                  const periodDisplay = course.class_times && course.class_times.length > 0
+                    ? course.class_times.map(t => `${t.start_period}-${t.end_period}節`).join('、')
                     : '未設定'
                   
                   const classroom = course.class_times && course.class_times.length > 0
@@ -440,7 +445,10 @@ export default function SearchCourses() {
                         {teacherNames}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {timeDisplay}
+                        {weekdayDisplay}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {periodDisplay}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         {classroom}
