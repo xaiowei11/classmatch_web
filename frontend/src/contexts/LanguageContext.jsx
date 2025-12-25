@@ -47,7 +47,8 @@ const i18n = {
             myCourses: '我的課表',
             searchCourses: '課程查詢',
             courseSelection: '加退選',
-            accountManagement: '個人帳號管理'
+            accountManagement: '個人帳號管理',
+            courseSystem: '選課系統'
         },
         account: {
             name: '姓名',
@@ -72,6 +73,10 @@ const i18n = {
             student: '學生',
             teacher: '教師',
             admin: '管理員'
+        },
+        landing: {
+            courseSystemDesc: '登入進行選課與管理',
+            querySystemDesc: '免登入・公開課程檢索'
         }
     },
     'en': {
@@ -118,7 +123,8 @@ const i18n = {
             myCourses: 'My Courses',
             searchCourses: 'Search',
             courseSelection: 'Add/Drop',
-            accountManagement: 'Account'
+            accountManagement: 'Account',
+            courseSystem: 'Course Selection'
         },
         account: {
             name: 'Name',
@@ -143,6 +149,10 @@ const i18n = {
             student: 'Student',
             teacher: 'Teacher',
             admin: 'Admin'
+        },
+        landing: {
+            courseSystemDesc: 'Login to access course selection',
+            querySystemDesc: 'Public access course search'
         }
     }
 }
