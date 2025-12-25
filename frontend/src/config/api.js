@@ -116,6 +116,7 @@ export const API_ENDPOINTS = {
   creditSummary: `${baseURL}/user/credit-summary/`,
   courseDetail: (id) => `${baseURL}/courses/${id}/`,
   courseDelete: (id) => `${baseURL}/courses/${id}/delete/`,
+  courseUpdate: (id) => `${baseURL}/courses/${id}/update/`,
   enrollCourse: (id) => `${baseURL}/courses/${id}/enroll/`,
   dropCourse: (id) => `${baseURL}/courses/${id}/drop/`,
   
