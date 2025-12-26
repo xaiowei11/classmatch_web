@@ -73,7 +73,6 @@ def search_courses(request):
         # 節次篩選（支援多選）- 新增這段
         if periods:
             # 建立 Q 查詢來檢查時段是否有交集
-            from django.db.models import Q
             period_query = Q()
             for period in periods:
                 period_int = int(period)
