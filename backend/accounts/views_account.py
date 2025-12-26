@@ -6,6 +6,9 @@ from django.contrib.auth.models import User
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import Profile, Role
+from PIL import Image
+import base64
+import io
 
 
 @api_view(['GET'])
@@ -53,7 +56,7 @@ def get_all_teachers(request):
             teachers_data.append({
                 'id': profile.user.id,
                 'username': profile.user.username,
-                'teacher_id': profile.teacher_id or profile.user.username, # 若無 teacher_id 則暫用 username
+                'teacher_id': profile.teacher_id or profile.user.username,
                 'real_name': profile.real_name,
                 'office': profile.office,
                 'title': profile.title,
@@ -114,7 +117,7 @@ def update_student(request, user_id):
 
 @api_view(['POST'])
 def upload_avatar(request):
-    """上傳大頭貼"""
+    """上傳大頭貼 (Base64 方案)"""
     if not request.user.is_authenticated:
         return Response({'error': '請先登入'}, status=401)
     
@@ -131,25 +134,49 @@ def upload_avatar(request):
         if avatar_file.content_type not in allowed_types:
             return Response({'error': '只支援 JPG、PNG、GIF、WebP 格式'}, status=400)
         
-        # 檢查文件大小 (最大 5MB)
-        if avatar_file.size > 5 * 1024 * 1024:
-            return Response({'error': '圖片大小不能超過 5MB'}, status=400)
+        # 檢查文件大小 (限制 2MB，因為 Base64 會變大)
+        if avatar_file.size > 2 * 1024 * 1024:
+            return Response({'error': '圖片大小不能超過 2MB'}, status=400)
         
-        # 刪除舊頭像
-        if profile.avatar:
-            profile.avatar.delete(save=False)
-        
-        # 保存新頭像
-        profile.avatar = avatar_file
-        profile.save()
-        
-        # 返回新頭像的 URL
-        avatar_url = request.build_absolute_uri(profile.avatar.url) if profile.avatar else None
-        
-        return Response({
-            'message': '上傳成功',
-            'avatar_url': avatar_url
-        })
+        # 使用 Pillow 處理圖片
+        try:
+            image = Image.open(avatar_file)
+            
+            # 轉換為 RGB（移除透明通道）
+            if image.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', image.size, (255, 255, 255))
+                if image.mode == 'P':
+                    image = image.convert('RGBA')
+                background.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
+                image = background
+            
+            # 調整大小（最大 400x400）
+            max_size = (400, 400)
+            image.thumbnail(max_size, Image.Resampling.LANCZOS)
+            
+            # 轉換為 JPEG 並壓縮
+            output = io.BytesIO()
+            image.save(output, format='JPEG', quality=85, optimize=True)
+            output.seek(0)
+            
+            # 轉換為 Base64
+            base64_image = base64.b64encode(output.read()).decode('utf-8')
+            avatar_data_url = f"data:image/jpeg;base64,{base64_image}"
+            
+            # 儲存到資料庫
+            profile.avatar = avatar_data_url
+            profile.save()
+            
+            print(f"✅ {request.user.username} 上傳大頭貼成功 (大小: {len(avatar_data_url)} bytes)")
+            
+            return Response({
+                'message': '上傳成功',
+                'avatar_url': avatar_data_url
+            })
+            
+        except Exception as img_error:
+            print(f"圖片處理錯誤: {str(img_error)}")
+            return Response({'error': f'圖片處理失敗: {str(img_error)}'}, status=400)
         
     except Exception as e:
         print(f"上傳大頭貼錯誤: {str(e)}")
@@ -166,9 +193,10 @@ def delete_avatar(request):
     
     try:
         profile = request.user.profile
+        profile.avatar = None
+        profile.save()
         
-        if profile.avatar:
-            profile.avatar.delete(save=True)
+        print(f"✅ {request.user.username} 刪除大頭貼成功")
         
         return Response({'message': '大頭貼已刪除'})
         
@@ -185,13 +213,19 @@ def get_avatar(request):
     
     try:
         profile = request.user.profile
-        avatar_url = request.build_absolute_uri(profile.avatar.url) if profile.avatar else None
+        
+        # Base64 方案：直接返回 avatar 欄位的內容
+        avatar_url = profile.avatar if profile.avatar else None
+        
+        if avatar_url:
+            print(f"✅ 返回 {request.user.username} 的大頭貼")
         
         return Response({
             'avatar_url': avatar_url
         })
         
     except Exception as e:
+        print(f"獲取大頭貼錯誤: {str(e)}")
         return Response({'error': str(e)}, status=500)
 
 
@@ -289,10 +323,13 @@ def get_profile_info(request):
         user = request.user
         profile = user.profile
         
+        # Base64 方案：直接返回 avatar 欄位
+        avatar_url = profile.avatar if profile.avatar else None
+        
         data = {
             'username': user.username,
             'real_name': profile.real_name or user.username,
-            'avatar_url': request.build_absolute_uri(profile.avatar.url) if profile.avatar else None,
+            'avatar_url': avatar_url,
             'roles': [r.name for r in profile.roles.all()],
         }
         
@@ -338,7 +375,6 @@ def reset_password(request, user_id):
             return Response({'error': '無法重設超級管理員密碼'}, status=403)
             
         # 3. 設定預設密碼
-        # 優先使用學號/教師編號，如果沒有則使用 username
         default_pwd = target_user.username
         if hasattr(target_user, 'profile'):
             if target_user.profile.student_id:

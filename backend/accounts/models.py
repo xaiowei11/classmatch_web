@@ -29,7 +29,7 @@ class Profile(models.Model):
     real_name = models.CharField(max_length=50, verbose_name="姓名")
     email = models.EmailField(blank=True, null=True, verbose_name="電子郵件")
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="電話")
-    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True, verbose_name="大頭貼")
+    avatar = models.TextField(blank=True, null=True, verbose_name="大頭貼 (Base64)")
     
     # 學生專用資料
     student_id = models.CharField(max_length=20, blank=True, null=True, unique=True, verbose_name="學號")
